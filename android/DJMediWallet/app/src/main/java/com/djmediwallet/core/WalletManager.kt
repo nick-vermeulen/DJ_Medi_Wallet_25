@@ -11,9 +11,12 @@ import java.util.*
 /**
  * Main wallet manager for handling medical credentials
  */
-class WalletManager private constructor(private val context: Context) {
+class WalletManager private constructor(
+    private val context: Context,
+    val config: WalletConfig
+) {
     
-    private val securityManager: SecurityManager = SecurityManager(context)
+    private val securityManager: SecurityManager = SecurityManager(context, config)
     private val credentialManager: CredentialManager = CredentialManager()
     private val storage: SecureStorage = SecureStorage(context)
     
@@ -21,12 +24,62 @@ class WalletManager private constructor(private val context: Context) {
         @Volatile
         private var INSTANCE: WalletManager? = null
         
+        /**
+         * Get singleton instance with default configuration
+         */
         fun getInstance(context: Context): WalletManager {
+            return getInstance(context, WalletConfig.DEFAULT)
+        }
+        
+        /**
+         * Get singleton instance with custom configuration
+         */
+        fun getInstance(context: Context, config: WalletConfig): WalletManager {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: WalletManager(context.applicationContext).also { INSTANCE = it }
+                INSTANCE ?: WalletManager(context.applicationContext, config).also { INSTANCE = it }
+            }
+        }
+        
+        /**
+         * Reset singleton instance (useful for testing or configuration changes)
+         */
+        fun resetInstance() {
+            synchronized(this) {
+                INSTANCE = null
             }
         }
     }
+    
+    /**
+     * Builder for creating WalletManager with custom configuration
+     */
+    class Builder(private val context: Context) {
+        private val configBuilder = WalletConfig.Builder()
+        
+        fun serviceName(name: String) = apply { configBuilder.serviceName(name) }
+        
+        fun userAuthenticationRequired(required: Boolean) = apply { 
+            configBuilder.userAuthenticationRequired(required) 
+        }
+        
+        fun authenticationTimeout(seconds: Int) = apply { 
+            configBuilder.authenticationTimeoutSeconds(seconds) 
+        }
+        
+        fun useStrongBox(use: Boolean) = apply { 
+            configBuilder.useStrongBox(use) 
+        }
+        
+        fun trustedReaderCertificates(certificates: List<ByteArray>?) = apply { 
+            configBuilder.trustedReaderCertificates(certificates) 
+        }
+        
+        fun build(): WalletManager {
+            val config = configBuilder.build()
+            return WalletManager(context.applicationContext, config)
+        }
+    }
+}
     
     // MARK: - Wallet Lifecycle
     

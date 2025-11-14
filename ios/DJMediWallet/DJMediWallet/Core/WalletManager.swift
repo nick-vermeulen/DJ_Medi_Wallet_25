@@ -16,16 +16,78 @@ public class WalletManager {
     private let securityManager: SecurityManager
     private let credentialManager: CredentialManager
     private let storage: SecureStorage
+    public let config: WalletConfig
     
-    public static let shared = WalletManager()
+    /// Shared instance with default configuration
+    public static let shared: WalletManager = {
+        return try! WalletManager(config: .default)
+    }()
     
     // MARK: - Initialization
     
-    private init() {
-        self.securityManager = SecurityManager()
+    /// Initialize wallet with configuration
+    /// - Parameter config: Wallet configuration
+    public init(config: WalletConfig) throws {
+        self.config = config
+        self.securityManager = SecurityManager(config: config)
         self.credentialManager = CredentialManager()
-        self.storage = SecureStorage()
+        self.storage = SecureStorage(serviceName: config.serviceName)
     }
+    
+    /// Builder for creating wallet with custom configuration
+    public class Builder {
+        private var serviceName: String = WalletConfig.defaultServiceName
+        private var accessGroup: String?
+        private var userAuthenticationRequired: Bool = true
+        private var authenticationTimeout: TimeInterval = 30
+        private var useSecureEnclaveWhenAvailable: Bool = true
+        private var trustedReaderCertificates: [Data]?
+        
+        public init() {}
+        
+        public func serviceName(_ name: String) -> Builder {
+            self.serviceName = name
+            return self
+        }
+        
+        public func accessGroup(_ group: String?) -> Builder {
+            self.accessGroup = group
+            return self
+        }
+        
+        public func userAuthenticationRequired(_ required: Bool) -> Builder {
+            self.userAuthenticationRequired = required
+            return self
+        }
+        
+        public func authenticationTimeout(_ timeout: TimeInterval) -> Builder {
+            self.authenticationTimeout = timeout
+            return self
+        }
+        
+        public func useSecureEnclave(_ use: Bool) -> Builder {
+            self.useSecureEnclaveWhenAvailable = use
+            return self
+        }
+        
+        public func trustedReaderCertificates(_ certificates: [Data]?) -> Builder {
+            self.trustedReaderCertificates = certificates
+            return self
+        }
+        
+        public func build() throws -> WalletManager {
+            let config = try WalletConfig(
+                serviceName: serviceName,
+                accessGroup: accessGroup,
+                userAuthenticationRequired: userAuthenticationRequired,
+                authenticationTimeout: authenticationTimeout,
+                useSecureEnclaveWhenAvailable: useSecureEnclaveWhenAvailable,
+                trustedReaderCertificates: trustedReaderCertificates
+            )
+            return try WalletManager(config: config)
+        }
+    }
+}
     
     // MARK: - Wallet Lifecycle
     

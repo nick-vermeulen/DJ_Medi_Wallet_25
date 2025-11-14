@@ -13,12 +13,12 @@ public class SecureStorage {
     
     // MARK: - Properties
     
-    private let containerName = "DJMediWallet"
+    private let serviceName: String
     private var isStorageInitialized = false
     
     // Core Data stack
     private lazy var persistentContainer: NSPersistentContainer = {
-        let container = NSPersistentContainer(name: containerName)
+        let container = NSPersistentContainer(name: serviceName)
         container.loadPersistentStores { description, error in
             if let error = error {
                 fatalError("Unable to load persistent stores: \(error)")
@@ -32,6 +32,12 @@ public class SecureStorage {
     }
     
     // MARK: - Initialization
+    
+    /// Initialize storage with service name
+    /// - Parameter serviceName: Service name for storage identification
+    public init(serviceName: String) {
+        self.serviceName = serviceName
+    }
     
     /// Initialize storage
     public func initialize(completion: @escaping (Result<Void, WalletError>) -> Void) {

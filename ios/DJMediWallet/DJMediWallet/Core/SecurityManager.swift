@@ -15,8 +15,23 @@ public class SecurityManager {
     
     // MARK: - Properties
     
-    private let keychainService = "com.djmediwallet.keychain"
-    private let deviceKeyTag = "com.djmediwallet.devicekey"
+    private let config: WalletConfig
+    private let deviceKeyTag: String
+    
+    /// Check if Secure Enclave is available on this device
+    public static var isSecureEnclaveAvailable: Bool {
+        if #available(iOS 13.0, *) {
+            return SecureEnclave.isAvailable
+        }
+        return false
+    }
+    
+    /// Initialize security manager with configuration
+    /// - Parameter config: Wallet configuration
+    public init(config: WalletConfig) {
+        self.config = config
+        self.deviceKeyTag = "\(config.serviceName).devicekey"
+    }
     
     // MARK: - Key Management
     
@@ -24,12 +39,16 @@ public class SecurityManager {
     public func generateDeviceKeyPair(completion: @escaping (Result<Void, Error>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                // Generate P-256 key pair
-                let privateKey = P256.Signing.PrivateKey()
-                let publicKey = privateKey.publicKey
-                
-                // Store private key in Keychain
-                try self.storePrivateKey(privateKey)
+                // Try Secure Enclave first if configured and available
+                if self.config.useSecureEnclaveWhenAvailable && Self.isSecureEnclaveAvailable {
+                    if #available(iOS 13.0, *) {
+                        try self.generateSecureEnclaveKey()
+                    } else {
+                        try self.generateSoftwareKey()
+                    }
+                } else {
+                    try self.generateSoftwareKey()
+                }
                 
                 DispatchQueue.main.async {
                     completion(.success(()))
@@ -42,12 +61,77 @@ public class SecurityManager {
         }
     }
     
+    /// Generate key in Secure Enclave (iOS 13+)
+    @available(iOS 13.0, *)
+    private func generateSecureEnclaveKey() throws {
+        let privateKey = try SecureEnclave.P256.Signing.PrivateKey(
+            accessControl: createAccessControl()
+        )
+        try storeSecureEnclaveKey(privateKey)
+    }
+    
+    /// Generate software-based key
+    private func generateSoftwareKey() throws {
+        let privateKey = P256.Signing.PrivateKey()
+        try storePrivateKey(privateKey)
+    }
+    
+    /// Create access control for key with biometric protection
+    private func createAccessControl() -> SecAccessControl {
+        var flags: SecAccessControlCreateFlags = []
+        
+        if config.userAuthenticationRequired {
+            if #available(iOS 11.3, *) {
+                flags.insert(.biometryCurrentSet)
+            } else {
+                flags.insert(.touchIDCurrentSet)
+            }
+            flags.insert(.privateKeyUsage)
+        }
+        
+        let access = SecAccessControlCreateWithFlags(
+            nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            flags,
+            nil
+        )!
+        
+        return access
+    }
+    
     /// Check if device key pair exists
     public func hasDeviceKeyPair() -> Bool {
         return retrievePrivateKey() != nil
     }
     
-    /// Store private key in Keychain with biometric protection
+    /// Store Secure Enclave private key in Keychain
+    @available(iOS 13.0, *)
+    private func storeSecureEnclaveKey(_ key: SecureEnclave.P256.Signing.PrivateKey) throws {
+        let keyData = key.dataRepresentation
+        
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: deviceKeyTag,
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecValueData as String: keyData,
+            kSecAttrAccessControl as String: createAccessControl(),
+            kSecUseDataProtectionKeychain as String: true
+        ]
+        
+        if let accessGroup = config.accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+        
+        // Delete any existing key first
+        SecItemDelete(query as CFDictionary)
+        
+        let status = SecItemAdd(query as CFDictionary, nil)
+        guard status == errSecSuccess else {
+            throw SecurityError.keychainError(status)
+        }
+    }
+    
+    /// Store private key in Keychain with optional biometric protection
     private func storePrivateKey(_ key: P256.Signing.PrivateKey) throws {
         let keyData = key.rawRepresentation
         
@@ -55,19 +139,18 @@ public class SecurityManager {
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: deviceKeyTag,
             kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
-            kSecValueData as String: keyData,
-            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            kSecValueData as String: keyData
         ]
         
-        // Add biometric protection if available
-        if #available(iOS 13.0, *) {
-            let access = SecAccessControlCreateWithFlags(
-                nil,
-                kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-                .biometryCurrentSet,
-                nil
-            )
-            query[kSecAttrAccessControl as String] = access
+        // Add access control if user authentication is required
+        if config.userAuthenticationRequired {
+            query[kSecAttrAccessControl as String] = createAccessControl()
+        } else {
+            query[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+        }
+        
+        if let accessGroup = config.accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
         }
         
         // Delete any existing key first
@@ -81,11 +164,22 @@ public class SecurityManager {
     
     /// Retrieve private key from Keychain
     private func retrievePrivateKey() -> P256.Signing.PrivateKey? {
-        let query: [String: Any] = [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: deviceKeyTag,
             kSecReturnData as String: true
         ]
+        
+        if let accessGroup = config.accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+        
+        // Add authentication context if required
+        if config.userAuthenticationRequired {
+            let context = LAContext()
+            context.localizedReason = "Authenticate to access your medical credentials"
+            query[kSecUseAuthenticationContext as String] = context
+        }
         
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)

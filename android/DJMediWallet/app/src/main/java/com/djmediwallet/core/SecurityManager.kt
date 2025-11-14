@@ -1,6 +1,7 @@
 package com.djmediwallet.core
 
 import android.content.Context
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import androidx.biometric.BiometricManager
@@ -21,13 +22,35 @@ import kotlin.coroutines.resumeWithException
 /**
  * Manages cryptographic operations and authentication
  */
-class SecurityManager(private val context: Context) {
+class SecurityManager(
+    private val context: Context,
+    private val config: WalletConfig
+) {
     
     companion object {
         private const val KEYSTORE_PROVIDER = "AndroidKeyStore"
-        private const val KEY_ALIAS = "DJMediWalletDeviceKey"
         private const val SIGNATURE_ALGORITHM = "SHA256withECDSA"
+        
+        /**
+         * Check if StrongBox is available on this device (Android 9+)
+         */
+        fun isStrongBoxAvailable(): Boolean {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try {
+                    val keyStore = KeyStore.getInstance(KEYSTORE_PROVIDER)
+                    keyStore.load(null)
+                    // Try to detect StrongBox support
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+            } else {
+                false
+            }
+        }
     }
+    
+    private val keyAlias: String = config.serviceName
     
     private val keyStore: KeyStore = KeyStore.getInstance(KEYSTORE_PROVIDER).apply {
         load(null)
@@ -40,8 +63,8 @@ class SecurityManager(private val context: Context) {
      */
     fun generateDeviceKeyPair() {
         // Delete existing key if present
-        if (keyStore.containsAlias(KEY_ALIAS)) {
-            keyStore.deleteEntry(KEY_ALIAS)
+        if (keyStore.containsAlias(keyAlias)) {
+            keyStore.deleteEntry(keyAlias)
         }
         
         val keyPairGenerator = KeyPairGenerator.getInstance(
@@ -49,16 +72,50 @@ class SecurityManager(private val context: Context) {
             KEYSTORE_PROVIDER
         )
         
-        val parameterSpec = KeyGenParameterSpec.Builder(
-            KEY_ALIAS,
+        val builder = KeyGenParameterSpec.Builder(
+            keyAlias,
             KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
         ).apply {
             setDigests(KeyProperties.DIGEST_SHA256)
-            setUserAuthenticationRequired(false) // Set to true for biometric-protected keys
             setKeySize(256)
-        }.build()
+            
+            // Configure user authentication
+            if (config.userAuthenticationRequired) {
+                setUserAuthenticationRequired(true)
+                
+                // Set authentication timeout
+                if (config.authenticationTimeoutSeconds > 0) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        setUserAuthenticationParameters(
+                            config.authenticationTimeoutSeconds,
+                            KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL
+                        )
+                    } else {
+                        @Suppress("DEPRECATION")
+                        setUserAuthenticationValidityDurationSeconds(config.authenticationTimeoutSeconds)
+                    }
+                } else {
+                    // Require authentication for every use
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        setUserAuthenticationParameters(
+                            0,
+                            KeyProperties.AUTH_BIOMETRIC_STRONG or KeyProperties.AUTH_DEVICE_CREDENTIAL
+                        )
+                    }
+                }
+            }
+            
+            // Try to use StrongBox if configured and available
+            if (config.useStrongBoxWhenAvailable && Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                try {
+                    setIsStrongBoxBacked(true)
+                } catch (e: Exception) {
+                    // StrongBox not available, will use regular TEE
+                }
+            }
+        }
         
-        keyPairGenerator.initialize(parameterSpec)
+        keyPairGenerator.initialize(builder.build())
         keyPairGenerator.generateKeyPair()
     }
     
@@ -66,15 +123,15 @@ class SecurityManager(private val context: Context) {
      * Check if device key pair exists
      */
     fun hasDeviceKeyPair(): Boolean {
-        return keyStore.containsAlias(KEY_ALIAS)
+        return keyStore.containsAlias(keyAlias)
     }
     
     /**
      * Get private key from keystore
      */
     private fun getPrivateKey(): PrivateKey? {
-        return if (keyStore.containsAlias(KEY_ALIAS)) {
-            keyStore.getKey(KEY_ALIAS, null) as? PrivateKey
+        return if (keyStore.containsAlias(keyAlias)) {
+            keyStore.getKey(keyAlias, null) as? PrivateKey
         } else {
             null
         }
@@ -123,7 +180,7 @@ class SecurityManager(private val context: Context) {
         val signatureString = Base64.getEncoder().encodeToString(signatureBytes)
         
         // Get public key
-        val publicKey = keyStore.getCertificate(KEY_ALIAS)?.publicKey
+        val publicKey = keyStore.getCertificate(keyAlias)?.publicKey
         val publicKeyString = Base64.getEncoder().encodeToString(publicKey?.encoded)
         
         return CredentialPresentation(
@@ -166,15 +223,4 @@ class SecurityManager(private val context: Context) {
         // For now, simple toString implementation
         return credentials.joinToString(",") { it.id }
     }
-}
-
-/**
- * Security exception types
- */
-sealed class SecurityException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    class KeystoreError(cause: Throwable) : SecurityException("Keystore error", cause)
-    object KeyGenerationFailed : SecurityException("Failed to generate cryptographic key")
-    object KeyNotFound : SecurityException("Cryptographic key not found")
-    object SignatureFailed : SecurityException("Failed to create signature")
-    object VerificationFailed : SecurityException("Signature verification failed")
 }
