@@ -1,0 +1,600 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXContainerItemProxy section */
+		04EA6EAD2EC7D1C9002601A8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 04EA6E932EC7D1C8002601A8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04EA6E9A2EC7D1C8002601A8;
+			remoteInfo = DJMediWallet25;
+		};
+		04EA6EB72EC7D1C9002601A8 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 04EA6E932EC7D1C8002601A8 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 04EA6E9A2EC7D1C8002601A8;
+			remoteInfo = DJMediWallet25;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		04EA6E9B2EC7D1C8002601A8 /* DJMediWallet25.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DJMediWallet25.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		04EA6EAC2EC7D1C9002601A8 /* DJMediWallet25Tests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DJMediWallet25Tests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		04EA6EB62EC7D1C9002601A8 /* DJMediWallet25UITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DJMediWallet25UITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		04EA6EBE2EC7D1C9002601A8 /* Exceptions for "DJMediWallet25" folder in "DJMediWallet25" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 04EA6E9A2EC7D1C8002601A8 /* DJMediWallet25 */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		04EA6E9D2EC7D1C8002601A8 /* DJMediWallet25 */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				04EA6EBE2EC7D1C9002601A8 /* Exceptions for "DJMediWallet25" folder in "DJMediWallet25" target */,
+			);
+			path = DJMediWallet25;
+			sourceTree = "<group>";
+		};
+		04EA6EAF2EC7D1C9002601A8 /* DJMediWallet25Tests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DJMediWallet25Tests;
+			sourceTree = "<group>";
+		};
+		04EA6EB92EC7D1C9002601A8 /* DJMediWallet25UITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = DJMediWallet25UITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		04EA6E982EC7D1C8002601A8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04EA6EA92EC7D1C9002601A8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04EA6EB32EC7D1C9002601A8 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		04EA6E922EC7D1C8002601A8 = {
+			isa = PBXGroup;
+			children = (
+				04EA6E9D2EC7D1C8002601A8 /* DJMediWallet25 */,
+				04EA6EAF2EC7D1C9002601A8 /* DJMediWallet25Tests */,
+				04EA6EB92EC7D1C9002601A8 /* DJMediWallet25UITests */,
+				04EA6E9C2EC7D1C8002601A8 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		04EA6E9C2EC7D1C8002601A8 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				04EA6E9B2EC7D1C8002601A8 /* DJMediWallet25.app */,
+				04EA6EAC2EC7D1C9002601A8 /* DJMediWallet25Tests.xctest */,
+				04EA6EB62EC7D1C9002601A8 /* DJMediWallet25UITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		04EA6E9A2EC7D1C8002601A8 /* DJMediWallet25 */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 04EA6EBF2EC7D1C9002601A8 /* Build configuration list for PBXNativeTarget "DJMediWallet25" */;
+			buildPhases = (
+				04EA6E972EC7D1C8002601A8 /* Sources */,
+				04EA6E982EC7D1C8002601A8 /* Frameworks */,
+				04EA6E992EC7D1C8002601A8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				04EA6E9D2EC7D1C8002601A8 /* DJMediWallet25 */,
+			);
+			name = DJMediWallet25;
+			packageProductDependencies = (
+			);
+			productName = DJMediWallet25;
+			productReference = 04EA6E9B2EC7D1C8002601A8 /* DJMediWallet25.app */;
+			productType = "com.apple.product-type.application";
+		};
+		04EA6EAB2EC7D1C9002601A8 /* DJMediWallet25Tests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 04EA6EC42EC7D1C9002601A8 /* Build configuration list for PBXNativeTarget "DJMediWallet25Tests" */;
+			buildPhases = (
+				04EA6EA82EC7D1C9002601A8 /* Sources */,
+				04EA6EA92EC7D1C9002601A8 /* Frameworks */,
+				04EA6EAA2EC7D1C9002601A8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				04EA6EAE2EC7D1C9002601A8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				04EA6EAF2EC7D1C9002601A8 /* DJMediWallet25Tests */,
+			);
+			name = DJMediWallet25Tests;
+			packageProductDependencies = (
+			);
+			productName = DJMediWallet25Tests;
+			productReference = 04EA6EAC2EC7D1C9002601A8 /* DJMediWallet25Tests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		04EA6EB52EC7D1C9002601A8 /* DJMediWallet25UITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 04EA6EC72EC7D1C9002601A8 /* Build configuration list for PBXNativeTarget "DJMediWallet25UITests" */;
+			buildPhases = (
+				04EA6EB22EC7D1C9002601A8 /* Sources */,
+				04EA6EB32EC7D1C9002601A8 /* Frameworks */,
+				04EA6EB42EC7D1C9002601A8 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				04EA6EB82EC7D1C9002601A8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				04EA6EB92EC7D1C9002601A8 /* DJMediWallet25UITests */,
+			);
+			name = DJMediWallet25UITests;
+			packageProductDependencies = (
+			);
+			productName = DJMediWallet25UITests;
+			productReference = 04EA6EB62EC7D1C9002601A8 /* DJMediWallet25UITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		04EA6E932EC7D1C8002601A8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					04EA6E9A2EC7D1C8002601A8 = {
+						CreatedOnToolsVersion = 26.0.1;
+					};
+					04EA6EAB2EC7D1C9002601A8 = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 04EA6E9A2EC7D1C8002601A8;
+					};
+					04EA6EB52EC7D1C9002601A8 = {
+						CreatedOnToolsVersion = 26.0.1;
+						TestTargetID = 04EA6E9A2EC7D1C8002601A8;
+					};
+				};
+			};
+			buildConfigurationList = 04EA6E962EC7D1C8002601A8 /* Build configuration list for PBXProject "DJMediWallet25" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 04EA6E922EC7D1C8002601A8;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 04EA6E9C2EC7D1C8002601A8 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				04EA6E9A2EC7D1C8002601A8 /* DJMediWallet25 */,
+				04EA6EAB2EC7D1C9002601A8 /* DJMediWallet25Tests */,
+				04EA6EB52EC7D1C9002601A8 /* DJMediWallet25UITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		04EA6E992EC7D1C8002601A8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04EA6EAA2EC7D1C9002601A8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04EA6EB42EC7D1C9002601A8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		04EA6E972EC7D1C8002601A8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04EA6EA82EC7D1C9002601A8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		04EA6EB22EC7D1C9002601A8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		04EA6EAE2EC7D1C9002601A8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 04EA6E9A2EC7D1C8002601A8 /* DJMediWallet25 */;
+			targetProxy = 04EA6EAD2EC7D1C9002601A8 /* PBXContainerItemProxy */;
+		};
+		04EA6EB82EC7D1C9002601A8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 04EA6E9A2EC7D1C8002601A8 /* DJMediWallet25 */;
+			targetProxy = 04EA6EB72EC7D1C9002601A8 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		04EA6EC02EC7D1C9002601A8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DJMediWallet25/DJMediWallet25.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H9P89B5KC7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DJMediWallet25/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LazyJack.DJMediWallet25;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		04EA6EC12EC7D1C9002601A8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DJMediWallet25/DJMediWallet25.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H9P89B5KC7;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = DJMediWallet25/Info.plist;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LazyJack.DJMediWallet25;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		04EA6EC22EC7D1C9002601A8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = H9P89B5KC7;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		04EA6EC32EC7D1C9002601A8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = H9P89B5KC7;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		04EA6EC52EC7D1C9002601A8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H9P89B5KC7;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LazyJack.DJMediWallet25Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DJMediWallet25.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DJMediWallet25";
+			};
+			name = Debug;
+		};
+		04EA6EC62EC7D1C9002601A8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H9P89B5KC7;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LazyJack.DJMediWallet25Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/DJMediWallet25.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/DJMediWallet25";
+			};
+			name = Release;
+		};
+		04EA6EC82EC7D1C9002601A8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H9P89B5KC7;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LazyJack.DJMediWallet25UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = DJMediWallet25;
+			};
+			name = Debug;
+		};
+		04EA6EC92EC7D1C9002601A8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = H9P89B5KC7;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.LazyJack.DJMediWallet25UITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRING_CATALOG_GENERATE_SYMBOLS = NO;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = DJMediWallet25;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		04EA6E962EC7D1C8002601A8 /* Build configuration list for PBXProject "DJMediWallet25" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04EA6EC22EC7D1C9002601A8 /* Debug */,
+				04EA6EC32EC7D1C9002601A8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		04EA6EBF2EC7D1C9002601A8 /* Build configuration list for PBXNativeTarget "DJMediWallet25" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04EA6EC02EC7D1C9002601A8 /* Debug */,
+				04EA6EC12EC7D1C9002601A8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		04EA6EC42EC7D1C9002601A8 /* Build configuration list for PBXNativeTarget "DJMediWallet25Tests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04EA6EC52EC7D1C9002601A8 /* Debug */,
+				04EA6EC62EC7D1C9002601A8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		04EA6EC72EC7D1C9002601A8 /* Build configuration list for PBXNativeTarget "DJMediWallet25UITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				04EA6EC82EC7D1C9002601A8 /* Debug */,
+				04EA6EC92EC7D1C9002601A8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 04EA6E932EC7D1C8002601A8 /* Project object */;
+}
