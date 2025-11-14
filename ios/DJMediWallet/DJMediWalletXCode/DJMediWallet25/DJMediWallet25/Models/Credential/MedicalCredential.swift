@@ -67,24 +67,27 @@ public struct FHIRResource: Codable {
     }
     
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        resourceType = try container.decode(String.self, forKey: .resourceType)
-        id = try container.decodeIfPresent(String.self, forKey: .id)
-        
-        // Decode remaining data as dictionary
-        let fullContainer = try decoder.singleValueContainer()
-        data = try fullContainer.decode([String: Any].self) as? [String: Any]
+        let container = try decoder.container(keyedBy: JSONCodingKeys.self)
+        let fullData = try container.decode([String: Any].self)
+        guard let resourceType = fullData["resourceType"] as? String else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: container.codingPath, debugDescription: "Missing or invalid resourceType"))
+        }
+        self.resourceType = resourceType
+        self.id = fullData["id"] as? String
+        var additionalData = fullData
+        additionalData.removeValue(forKey: "resourceType")
+        additionalData.removeValue(forKey: "id")
+        self.data = additionalData.isEmpty ? nil : additionalData
     }
     
     public func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(resourceType, forKey: .resourceType)
-        try container.encodeIfPresent(id, forKey: .id)
-        
-        // Encode additional data
+        var container = encoder.container(keyedBy: JSONCodingKeys.self)
+        try container.encode(resourceType, forKey: JSONCodingKeys(stringValue: "resourceType"))
+        if let id = id {
+            try container.encode(id, forKey: JSONCodingKeys(stringValue: "id"))
+        }
         if let data = data {
-            var fullContainer = encoder.singleValueContainer()
-            try fullContainer.encode(data)
+            try container.encode(data)
         }
     }
 }
@@ -106,6 +109,7 @@ public struct CredentialProof: Codable {
 
 // MARK: - Codable Support for [String: Any]
 
+// Decoding extensions (unchanged from original)
 extension KeyedDecodingContainer {
     func decode(_ type: Dictionary<String, Any>.Type, forKey key: K) throws -> Dictionary<String, Any> {
         let container = try self.nestedContainer(keyedBy: JSONCodingKeys.self, forKey: key)
@@ -177,6 +181,84 @@ extension UnkeyedDecodingContainer {
     mutating func decode(_ type: Dictionary<String, Any>.Type) throws -> Dictionary<String, Any> {
         let nestedContainer = try self.nestedContainer(keyedBy: JSONCodingKeys.self)
         return try nestedContainer.decode(type)
+    }
+}
+
+// Encoding extensions (newly added for symmetry)
+extension KeyedEncodingContainer {
+    mutating func encode(_ value: [String: Any], forKey key: K) throws {
+        var container = self.nestedContainer(keyedBy: JSONCodingKeys.self, forKey: key)
+        try container.encode(value)
+    }
+    
+    mutating func encodeIfPresent(_ value: [String: Any]?, forKey key: K) throws {
+        if let value = value {
+            try encode(value, forKey: key)
+        }
+    }
+    
+    mutating func encode(_ value: [Any], forKey key: K) throws {
+        var container = self.nestedUnkeyedContainer(forKey: key)
+        try container.encode(value)
+    }
+    
+    mutating func encodeIfPresent(_ value: [Any]?, forKey key: K) throws {
+        if let value = value {
+            try encode(value, forKey: key)
+        }
+    }
+    
+    mutating func encode(_ value: [String: Any]) throws {
+        for (k, v) in value {
+            let codingKey = JSONCodingKeys(stringValue: k)
+            try encodeAny(v, forKey: codingKey)
+        }
+    }
+    
+    private mutating func encodeAny(_ value: Any, forKey key: KeyedEncodingContainer<K>.Key) throws {
+        if let bool = value as? Bool {
+            try encode(bool, forKey: key)
+        } else if let string = value as? String {
+            try encode(string, forKey: key)
+        } else if let int = value as? Int {
+            try encode(int, forKey: key)
+        } else if let double = value as? Double {
+            try encode(double, forKey: key)
+        } else if let dict = value as? [String: Any] {
+            var container = nestedContainer(keyedBy: JSONCodingKeys.self, forKey: key)
+            try container.encode(dict)
+        } else if let array = value as? [Any] {
+            var container = nestedUnkeyedContainer(forKey: key)
+            try container.encode(array)
+        }
+        // Add more type cases if your FHIR data requires (e.g., UInt, Float, etc.)
+    }
+}
+
+extension UnkeyedEncodingContainer {
+    mutating func encode(_ value: [Any]) throws {
+        for v in value {
+            try encodeAny(v)
+        }
+    }
+    
+    private mutating func encodeAny(_ value: Any) throws {
+        if let bool = value as? Bool {
+            try encode(bool)
+        } else if let string = value as? String {
+            try encode(string)
+        } else if let int = value as? Int {
+            try encode(int)
+        } else if let double = value as? Double {
+            try encode(double)
+        } else if let dict = value as? [String: Any] {
+            var container = nestedContainer(keyedBy: JSONCodingKeys.self)
+            try container.encode(dict)
+        } else if let array = value as? [Any] {
+            var container = nestedUnkeyedContainer()
+            try container.encode(array)
+        }
+        // Add more type cases if your FHIR data requires (e.g., UInt, Float, etc.)
     }
 }
 
