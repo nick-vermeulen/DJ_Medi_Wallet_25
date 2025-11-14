@@ -1,0 +1,46 @@
+# General
+.DS_Store
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# iOS
+ios/DJMediWallet/Build/
+ios/DJMediWallet/DerivedData/
+ios/DJMediWallet/*.xcworkspace/xcuserdata/
+ios/DJMediWallet/*.xcodeproj/xcuserdata/
+ios/DJMediWallet/*.xcodeproj/project.xcworkspace/xcuserdata/
+ios/DJMediWallet/.swiftpm/
+ios/DJMediWallet/Pods/
+ios/DJMediWallet/Podfile.lock
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Android
+android/DJMediWallet/.gradle/
+android/DJMediWallet/build/
+android/DJMediWallet/app/build/
+android/DJMediWallet/.idea/
+android/DJMediWallet/local.properties
+android/DJMediWallet/*.iml
+android/DJMediWallet/.cxx/
+android/DJMediWallet/captures/
+*.apk
+*.aab
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.log
+
+# Credentials and secrets (never commit)
+*.key
+*.pem
+*.p12
+*.mobileprovision
+keystore.properties
+secrets.properties
