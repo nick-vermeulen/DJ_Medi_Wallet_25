@@ -7,9 +7,10 @@
 
 import Foundation
 import CryptoKit
+import Combine
 
 /// Main wallet manager for handling medical credentials
-public class WalletManager {
+public class WalletManager: ObservableObject {
     
     // MARK: - Properties
     
@@ -87,7 +88,6 @@ public class WalletManager {
             return try WalletManager(config: config)
         }
     }
-}
     
     // MARK: - Wallet Lifecycle
     

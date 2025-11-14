@@ -66,11 +66,11 @@ public struct Dosage: Codable {
 
 /// FHIR Timing
 public struct Timing: Codable {
-    public let repeat: TimingRepeat?
+    public let `repeat`: TimingRepeat?
     public let code: CodeableConcept?
     
-    public init(repeat: TimingRepeat? = nil, code: CodeableConcept? = nil) {
-        self.repeat = `repeat`
+    public init(`repeat`: TimingRepeat? = nil, code: CodeableConcept? = nil) {
+        self.`repeat` = `repeat`
         self.code = code
     }
 }
