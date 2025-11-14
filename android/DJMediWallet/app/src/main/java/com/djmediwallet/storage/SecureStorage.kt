@@ -2,14 +2,12 @@ package com.djmediwallet.storage
 
 import android.content.Context
 import com.djmediwallet.models.credential.MedicalCredential
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.*
-import javax.crypto.Cipher
-import javax.crypto.KeyGenerator
-import javax.crypto.SecretKey
-import javax.crypto.spec.IvParameterSpec
 
 /**
  * Manages secure storage of medical credentials
@@ -19,11 +17,12 @@ class SecureStorage(private val context: Context) {
     companion object {
         private const val STORAGE_DIR = "credentials"
         private const val FILE_EXTENSION = ".enc"
-        private const val CIPHER_ALGORITHM = "AES/CBC/PKCS5Padding"
-        private const val KEY_ALGORITHM = "AES"
     }
     
     private var initialized = false
+    private val gson: Gson = GsonBuilder()
+        .setDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+        .create()
     
     // MARK: - Initialization
     
@@ -50,9 +49,9 @@ class SecureStorage(private val context: Context) {
      */
     suspend fun storeCredential(credential: MedicalCredential) = withContext(Dispatchers.IO) {
         // Serialize credential
-        val json = serializeCredential(credential)
+        val json = gson.toJson(credential)
         
-        // Encrypt
+        // Encrypt (placeholder - in production use Android Keystore)
         val encrypted = encrypt(json.toByteArray())
         
         // Save to file
@@ -96,12 +95,12 @@ class SecureStorage(private val context: Context) {
         // Read encrypted data
         val encrypted = file.readBytes()
         
-        // Decrypt
+        // Decrypt (placeholder - in production use Android Keystore)
         val decrypted = decrypt(encrypted)
         
         // Deserialize
         val json = String(decrypted)
-        return deserializeCredential(json)
+        return gson.fromJson(json, MedicalCredential::class.java)
     }
     
     /**
@@ -128,52 +127,6 @@ class SecureStorage(private val context: Context) {
         // In production, use proper key from Android Keystore
         // For now, simple implementation (placeholder)
         return data
-    }
-    
-    // MARK: - Serialization
-    
-    private fun serializeCredential(credential: MedicalCredential): String {
-        // In production, use proper JSON serialization (e.g., Gson, Kotlinx Serialization)
-        // Simple implementation for now
-        return buildString {
-            append("{")
-            append("\"id\":\"${credential.id}\",")
-            append("\"type\":\"${credential.type}\",")
-            append("\"issuer\":\"${credential.issuer}\",")
-            append("\"issuanceDate\":\"${credential.issuanceDate.time}\",")
-            append("\"expirationDate\":${credential.expirationDate?.time ?: "null"}")
-            append("}")
-        }
-    }
-    
-    private fun deserializeCredential(json: String): MedicalCredential {
-        // In production, use proper JSON deserialization
-        // Simple implementation for now
-        val idRegex = "\"id\":\"([^\"]+)\"".toRegex()
-        val typeRegex = "\"type\":\"([^\"]+)\"".toRegex()
-        val issuerRegex = "\"issuer\":\"([^\"]+)\"".toRegex()
-        val issuanceDateRegex = "\"issuanceDate\":\"([^\"]+)\"".toRegex()
-        val expirationDateRegex = "\"expirationDate\":([^,}]+)".toRegex()
-        
-        val id = idRegex.find(json)?.groupValues?.get(1) ?: throw StorageException.DeserializationFailed
-        val type = typeRegex.find(json)?.groupValues?.get(1) ?: throw StorageException.DeserializationFailed
-        val issuer = issuerRegex.find(json)?.groupValues?.get(1) ?: throw StorageException.DeserializationFailed
-        val issuanceDate = Date(issuanceDateRegex.find(json)?.groupValues?.get(1)?.toLong() ?: throw StorageException.DeserializationFailed)
-        
-        val expirationDateStr = expirationDateRegex.find(json)?.groupValues?.get(1)
-        val expirationDate = if (expirationDateStr != "null") {
-            Date(expirationDateStr?.toLong() ?: 0)
-        } else {
-            null
-        }
-        
-        return MedicalCredential(
-            id = id,
-            type = type,
-            issuer = issuer,
-            issuanceDate = issuanceDate,
-            expirationDate = expirationDate
-        )
     }
     
     // MARK: - File System
