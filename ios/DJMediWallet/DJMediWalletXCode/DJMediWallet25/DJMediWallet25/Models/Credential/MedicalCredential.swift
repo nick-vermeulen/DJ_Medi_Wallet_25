@@ -207,7 +207,9 @@ extension KeyedEncodingContainer {
             try encode(value, forKey: key)
         }
     }
-    
+}
+
+extension KeyedEncodingContainer where Key == JSONCodingKeys {
     mutating func encode(_ value: [String: Any]) throws {
         for (k, v) in value {
             let codingKey = JSONCodingKeys(stringValue: k)
@@ -215,20 +217,20 @@ extension KeyedEncodingContainer {
         }
     }
     
-    private mutating func encodeAny(_ value: Any, forKey key: KeyedEncodingContainer<K>.Key) throws {
+    private mutating func encodeAny(_ value: Any, forKey: Key) throws {
         if let bool = value as? Bool {
-            try encode(bool, forKey: key)
+            try encode(bool, forKey: forKey)
         } else if let string = value as? String {
-            try encode(string, forKey: key)
+            try encode(string, forKey: forKey)
         } else if let int = value as? Int {
-            try encode(int, forKey: key)
+            try encode(int, forKey: forKey)
         } else if let double = value as? Double {
-            try encode(double, forKey: key)
+            try encode(double, forKey: forKey)
         } else if let dict = value as? [String: Any] {
-            var container = nestedContainer(keyedBy: JSONCodingKeys.self, forKey: key)
+            var container = nestedContainer(keyedBy: JSONCodingKeys.self, forKey: forKey)
             try container.encode(dict)
         } else if let array = value as? [Any] {
-            var container = nestedUnkeyedContainer(forKey: key)
+            var container = nestedUnkeyedContainer(forKey: forKey)
             try container.encode(array)
         }
         // Add more type cases if your FHIR data requires (e.g., UInt, Float, etc.)

@@ -201,6 +201,7 @@ struct MedicationFormView: View {
                     text: "\(dosage) \(frequency)",
                     timing: Timing(
                         code: CodeableConcept(
+                            coding: nil,
                             text: frequency
                         )
                     ),
