@@ -90,6 +90,56 @@ See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed architecture documentat
 | DiagnosticReport | Lab and imaging reports |
 | DocumentReference | Clinical documents |
 
+## User Interface
+
+### Features
+
+Both iOS and Android apps provide a complete user interface for:
+
+- **Viewing Medical Records**: Browse all stored medical records in a list view with easy-to-read cards
+- **Adding Records**: Form-based data entry for:
+  - **Vital Signs/Observations**: Blood Pressure, Heart Rate, Body Temperature, Weight, Height
+  - **Diagnoses/Conditions**: Select from 10 common conditions with SNOMED CT codes
+  - **Medications**: Select from 12 common medications with SNOMED CT codes
+- **Record Details**: View complete FHIR resource data in user-friendly format
+- **SNOMED CT Integration**: All diagnoses and medications include standardized SNOMED CT codes
+- **LOINC Codes**: All observations use proper LOINC codes for vital signs
+
+### Supported Medical Records
+
+#### Vital Signs (Observations)
+- Blood Pressure (systolic/diastolic) - LOINC 85354-9, 8480-6, 8462-4
+- Heart Rate - LOINC 8867-4, SNOMED 364075005
+- Body Temperature - LOINC 8310-5, SNOMED 386725007
+- Body Weight - LOINC 29463-7, SNOMED 27113001
+- Body Height - LOINC 8302-2, SNOMED 50373000
+
+#### Diagnoses (Conditions)
+- Hypertension - SNOMED 38341003
+- Diabetes Mellitus Type 2 - SNOMED 44054006
+- Asthma - SNOMED 195967001
+- Atrial Fibrillation - SNOMED 49436004
+- Chronic Obstructive Pulmonary Disease - SNOMED 13645005
+- Myocardial Infarction - SNOMED 22298006
+- Hyperlipidemia - SNOMED 55822004
+- Osteoarthritis - SNOMED 396275006
+- Depression - SNOMED 35489007
+- Anxiety Disorder - SNOMED 197480006
+
+#### Medications
+- Metformin - SNOMED 109081006
+- Aspirin - SNOMED 387458008
+- Lisinopril - SNOMED 386873009
+- Atorvastatin - SNOMED 373444002
+- Levothyroxine - SNOMED 126202002
+- Metoprolol - SNOMED 372826007
+- Amlodipine - SNOMED 386864001
+- Omeprazole - SNOMED 387137007
+- Simvastatin - SNOMED 387584000
+- Losartan - SNOMED 386876004
+- Albuterol - SNOMED 372897005
+- Gabapentin - SNOMED 386845007
+
 ## Getting Started
 
 ### iOS Development
