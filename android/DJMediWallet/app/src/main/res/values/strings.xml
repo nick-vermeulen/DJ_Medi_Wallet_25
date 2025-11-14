@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">DJ Medi Wallet</string>
+    <string name="app_description">Secure medical data wallet</string>
+    
+    <!-- Authentication -->
+    <string name="auth_title">Authentication Required</string>
+    <string name="auth_subtitle">Authenticate to access your medical wallet</string>
+    <string name="auth_cancel">Cancel</string>
+    
+    <!-- Credentials -->
+    <string name="credentials_title">My Credentials</string>
+    <string name="credentials_empty">No credentials stored</string>
+    <string name="credential_add">Add Credential</string>
+    <string name="credential_delete">Delete</string>
+    <string name="credential_share">Share</string>
+    
+    <!-- Errors -->
+    <string name="error_wallet_not_initialized">Wallet not initialized</string>
+    <string name="error_credential_invalid">Invalid credential</string>
+    <string name="error_storage_failed">Failed to store credential</string>
+    <string name="error_auth_failed">Authentication failed</string>
+    
+    <!-- General -->
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="delete">Delete</string>
+    <string name="share">Share</string>
+</resources>
