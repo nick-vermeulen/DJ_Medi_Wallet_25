@@ -92,6 +92,7 @@ final class AppLockManager: ObservableObject {
     
     enum SetupError: Error {
         case passcodeTooShort
+        case passcodeTooWeak
         case storageFailure(String)
         case walletInitializationFailure(String)
         case profileIncomplete
@@ -111,6 +112,13 @@ final class AppLockManager: ObservableObject {
     private let passcodeKey = "com.djmediwallet.passcode.hash"
     private let passphraseKey = "com.djmediwallet.passphrase.hash"
     private let lockTimeoutKey = "com.djmediwallet.lock.timeout"
+    private static let weakPasscodeCandidates: Set<String> = [
+        "000000", "111111", "222222", "333333", "444444", "555555",
+        "666666", "777777", "888888", "999999", "123456", "234567",
+        "345678", "456789", "012345", "543210", "654321", "765432",
+        "876543", "987654", "121212", "131313", "141414", "123123",
+        "321321", "135791"
+    ]
 
     private var lockWorkItem: DispatchWorkItem?
     private var supabaseAuthTask: Task<Void, Never>?
@@ -179,6 +187,9 @@ final class AppLockManager: ObservableObject {
     func completeOnboarding(passcode: String, enableBiometrics: Bool) async throws {
         guard passcode.count >= 6 else {
             throw SetupError.passcodeTooShort
+        }
+        guard !isWeakPasscode(passcode) else {
+            throw SetupError.passcodeTooWeak
         }
         guard userProfile != nil else {
             throw SetupError.profileIncomplete
@@ -400,6 +411,54 @@ final class AppLockManager: ObservableObject {
         let trimmed = passcode.trimmingCharacters(in: .whitespacesAndNewlines)
         let digest = SHA256.hash(data: Data(trimmed.utf8))
         return Data(digest)
+    }
+
+    private func isWeakPasscode(_ passcode: String) -> Bool {
+        if AppLockManager.weakPasscodeCandidates.contains(passcode) {
+            return true
+        }
+
+        let digits = passcode.compactMap { $0.wholeNumberValue }
+        guard digits.count == passcode.count else { return true }
+
+        if Set(digits).count == 1 {
+            return true
+        }
+
+        let pairs = zip(digits, digits.dropFirst())
+        let isAscending = pairs.allSatisfy { $1 == $0 + 1 }
+        let isDescending = pairs.allSatisfy { $1 == $0 - 1 }
+        if isAscending || isDescending {
+            return true
+        }
+
+        if digits.count >= 2 {
+            let first = digits[0]
+            let second = digits[1]
+            if first != second {
+                var isAlternating = true
+                for index in 0..<digits.count {
+                    let expected = index % 2 == 0 ? first : second
+                    if digits[index] != expected {
+                        isAlternating = false
+                        break
+                    }
+                }
+                if isAlternating {
+                    return true
+                }
+            }
+        }
+
+        if digits.count == 6 {
+            let firstHalf = Array(digits.prefix(3))
+            let secondHalf = Array(digits.suffix(3))
+            if firstHalf == secondHalf {
+                return true
+            }
+        }
+
+        return false
     }
 
     private func configureSupabaseAuthMonitoring() {

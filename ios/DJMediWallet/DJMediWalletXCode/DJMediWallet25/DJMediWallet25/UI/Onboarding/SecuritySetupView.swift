@@ -18,6 +18,7 @@ struct SecuritySetupView: View {
     @State private var biometricsAvailable = false
     @State private var isProcessing = false
     @State private var errorMessage: String?
+    @State private var isShowingErrorAlert = false
     @FocusState private var focusedField: FocusableField?
 
     private enum FocusableField {
@@ -88,6 +89,13 @@ struct SecuritySetupView: View {
             }
         }
         .simultaneousGesture(TapGesture().onEnded { focusedField = nil })
+        .alert("Passcode Issue", isPresented: $isShowingErrorAlert) {
+            Button("OK", role: .cancel) {
+                focusedField = .passcode
+            }
+        } message: {
+            Text(errorMessage ?? "Please try again.")
+        }
     }
     
     private var isActionEnabled: Bool {
@@ -108,28 +116,41 @@ struct SecuritySetupView: View {
             return "Biometrics"
         }
     }
+
+    private func clearError() {
+        errorMessage = nil
+        isShowingErrorAlert = false
+    }
+
+    private func presentError(_ message: String) {
+        errorMessage = message
+        isShowingErrorAlert = true
+        focusedField = .passcode
+    }
     
     private func completeSetup() {
         guard isActionEnabled else { return }
-        errorMessage = nil
+        clearError()
         isProcessing = true
         focusedField = nil
         let selectedBiometrics = allowBiometrics && biometricsAvailable
-        Task {
+        Task { @MainActor in
+            defer { isProcessing = false }
             do {
                 try await lockManager.completeOnboarding(passcode: passcode, enableBiometrics: selectedBiometrics)
             } catch AppLockManager.SetupError.passcodeTooShort {
-                errorMessage = "Passcode must be six digits."
+                presentError("Passcode must be six digits.")
+            } catch AppLockManager.SetupError.passcodeTooWeak {
+                presentError("Passcode is too easy to guess. Choose a less predictable combination.")
             } catch AppLockManager.SetupError.storageFailure(let reason) {
-                errorMessage = reason
+                presentError(reason)
             } catch AppLockManager.SetupError.walletInitializationFailure(let reason) {
-                errorMessage = "Wallet initialization failed: \(reason)"
+                presentError("Wallet initialization failed: \(reason)")
             } catch AppLockManager.SetupError.profileIncomplete {
-                errorMessage = "Please provide your name and role before completing setup."
+                presentError("Please provide your name and role before completing setup.")
             } catch {
-                errorMessage = "Unexpected error: \(error.localizedDescription)"
+                presentError("Unexpected error: \(error.localizedDescription)")
             }
-            isProcessing = false
         }
     }
 
