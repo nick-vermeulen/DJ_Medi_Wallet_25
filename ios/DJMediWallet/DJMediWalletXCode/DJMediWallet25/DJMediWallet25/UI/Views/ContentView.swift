@@ -18,7 +18,9 @@ struct ContentView: View {
                 }
                 .tag(0)
             
-            AddRecordView()
+            AddRecordView {
+                selectedTab = 0
+            }
                 .tabItem {
                     Label("Add", systemImage: "plus.circle.fill")
                 }

@@ -27,12 +27,17 @@ enum RecordType: String, CaseIterable {
 struct AddRecordView: View {
     @EnvironmentObject var walletManager: WalletManager
     @Environment(\.dismiss) private var dismiss
+    var onDismiss: (() -> Void)? = nil
     @State private var selectedType: RecordType = .observation
     @State private var isSaving = false
     @State private var showAlert = false
     @State private var alertMessage = ""
     @State private var didSaveSuccessfully = false
     
+    init(onDismiss: (() -> Void)? = nil) {
+        self.onDismiss = onDismiss
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -83,6 +88,7 @@ struct AddRecordView: View {
                     if didSaveSuccessfully {
                         didSaveSuccessfully = false
                         dismiss()
+                        onDismiss?()
                     }
                 }
             } message: {
@@ -137,7 +143,7 @@ struct AddRecordView: View {
         }
     }
 
-    private func handleSaveResult(_ result: Result<Void, Error>) {
+    private func handleSaveResult(_ result: Result<String, WalletError>) {
         switch result {
         case .success:
             alertMessage = "Record saved successfully!"
