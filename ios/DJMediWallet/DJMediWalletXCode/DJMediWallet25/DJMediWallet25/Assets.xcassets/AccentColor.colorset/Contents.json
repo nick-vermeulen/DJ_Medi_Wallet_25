@@ -1,6 +1,10 @@
 {
   "colors" : [
     {
+      "color" : {
+        "platform" : "universal",
+        "reference" : "systemIndigoColor"
+      },
       "filename" : "DJMediWallet-iOS-Default-1024x1024@1x.png",
       "idiom" : "universal"
     },
@@ -17,13 +21,25 @@
       "idiom" : "iphone"
     },
     {
+      "color" : {
+        "platform" : "ios",
+        "reference" : "linkColor"
+      },
       "idiom" : "ipad"
     },
     {
+      "color" : {
+        "platform" : "ios",
+        "reference" : "linkColor"
+      },
       "idiom" : "ipad",
       "subtype" : "mac-catalyst"
     },
     {
+      "color" : {
+        "platform" : "osx",
+        "reference" : "controlAccentColor"
+      },
       "idiom" : "mac"
     }
   ],
