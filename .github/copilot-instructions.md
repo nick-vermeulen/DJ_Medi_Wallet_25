@@ -1,0 +1,18 @@
+# DJ_Medi_Wallet_25 Copilot Instructions
+
+- **Architecture Overview**: Cross-platform wallet aligned with EU ARF; iOS SwiftUI app lives under `ios/DJMediWallet/DJMediWalletXCode/DJMediWallet25/DJMediWallet25`, Android Kotlin client under `android/DJMediWallet`. Shared docs for FHIR/SNOMED live in `docs/` and `shared/`.
+- **Active iOS Codepath**: Prefer editing files inside `DJMediWallet25` (new SwiftUI app). The sibling `ios/DJMediWallet/DJMediWallet` tree mirrors the older target—avoid touching it unless explicitly asked.
+For iOS development, ensure you follow these guidelines:
+Comply with Apple's Human Interface Guidelines and Data Protection standards.
+Specifically ensure that the keyboard interactions, accessibility features, and data storage practices meet Apple's requirements.
+- **State & Composition**: `AppRootView` decides between onboarding, lock screen, and main `ContentView` using the `AppLockManager` environment object; `ContentView` exposes `RecordsListView` and `SettingsView` tabs only.
+- **Authentication Flow**: `AppLockManager` (MainActor) manages onboarding, passcode, biometrics, and recovery passphrase. It hashes secrets with SHA256 before storing via `KeychainService`; auto-lock timers are scheduled on scene phase changes.
+- **Passphrase Handling**: `PassphraseManager` pulls its 12-word vocabulary from `Resources/passphrase_wordlist.txt` at runtime (with a minimal fallback). Always write new recovery features against `AppLockManager.generateRecoveryPassphrase` / `.storeRecoveryPassphrase` so hashing and keychain behavior stay consistent.
+- **Onboarding UX**: `OnboardingFlowView` drives a five-step TabView (welcome, compliance, passphrase display/confirm, security setup). Keyboard-safe layouts rely on `.safeAreaInset` and `.scrollDismissesKeyboard`; keep confirm buttons inside the inset when editing.
+- **Security Setup**: `SecuritySetupView` expects `canComplete` to reflect compliance acceptance and confirmed passphrase. Adjust onboarding state via the provided bindings rather than bypassing validation.
+- **Credential Lifecycle**: `WalletManager` is the canonical API for storing/verifying credentials. It wraps `SecurityManager`, `CredentialManager`, and `SecureStorage`; operations complete via callbacks. When adding async code, bridge with `withCheckedContinuation` like `RecordsListView.refreshRecords` does.
+- **UI Patterns**: Lists use `NavigationStack`, `.refreshable`, and swipe-to-delete; modals for record creation (`AddRecordView`) pass completion closures to refresh state. Maintain the same environment object access patterns (`@EnvironmentObject var walletManager: WalletManager`).
+- **Models & Data**: `MedicalCredential` embeds FHIR payloads as dictionaries; `RecordItem` converts them into display rows. Reuse existing formatters and SNOMED/LOINC mappings from `shared/` docs to keep terminology consistent.
+- **Build & Tests**: iOS builds via Xcode (`open ios/DJMediWallet/DJMediWalletXCode/DJMediWallet25/DJMediWallet25.xcodeproj`, run Cmd+R). CI-style tests: `xcodebuild test -scheme DJMediWallet25 -destination 'platform=iOS Simulator,name=iPhone 15'`. Android builds with Gradle (`./gradlew assembleDebug`, `./gradlew test`).
+- **Compliance Emphasis**: Features must respect ARF requirements—biometric gating, explicit consent, selective disclosure. When changing storage or presentation flows, cross-check `docs/ARCHITECTURE.md` and `docs/EUDI_ALIGNMENT_ANALYSIS.md` for rationale.
+- **Version Control**: The repo may contain uncommitted work; never overwrite user changes. Keep edits ASCII unless files already use other encodings.

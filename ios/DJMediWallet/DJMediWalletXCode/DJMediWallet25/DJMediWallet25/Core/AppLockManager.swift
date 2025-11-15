@@ -12,6 +12,36 @@ import CryptoKit
 
 @MainActor
 final class AppLockManager: ObservableObject {
+    struct UserProfile: Codable, Equatable {
+        enum Role: String, Codable, CaseIterable, Identifiable {
+            case patient
+            case practitioner
+            
+            var id: String { rawValue }
+            
+            var displayName: String {
+                switch self {
+                case .patient:
+                    return "Patient"
+                case .practitioner:
+                    return "Practitioner"
+                }
+            }
+        }
+        
+        var firstName: String
+        var lastName: String
+        var role: Role
+        
+        var normalizedFirstName: String {
+            firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        
+        var normalizedLastName: String {
+            lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+    
     enum LockState: Equatable {
         case onboarding
         case locked
@@ -22,11 +52,13 @@ final class AppLockManager: ObservableObject {
         case passcodeTooShort
         case storageFailure(String)
         case walletInitializationFailure(String)
+        case profileIncomplete
     }
     
     @Published private(set) var lockState: LockState
     @Published var lastErrorMessage: String?
     @Published var lockTimeout: TimeInterval
+    @Published private(set) var userProfile: UserProfile?
     
     private let walletManager: WalletManager
     private let keychain: KeychainService
@@ -37,6 +69,7 @@ final class AppLockManager: ObservableObject {
     private let passcodeKey = "com.djmediwallet.passcode.hash"
     private let passphraseKey = "com.djmediwallet.passphrase.hash"
     private let lockTimeoutKey = "com.djmediwallet.lock.timeout"
+    private let profileKey = "com.djmediwallet.user.profile"
 
     private var lockWorkItem: DispatchWorkItem?
     
@@ -48,6 +81,12 @@ final class AppLockManager: ObservableObject {
         self.walletManager = walletManager ?? WalletManager.shared
         self.keychain = keychain
         self.defaults = defaults
+        if let profileData = defaults.data(forKey: profileKey),
+           let decodedProfile = try? JSONDecoder().decode(UserProfile.self, from: profileData) {
+            self.userProfile = decodedProfile
+        } else {
+            self.userProfile = nil
+        }
         if defaults.bool(forKey: onboardingKey) {
             self.lockState = .locked
         } else {
@@ -93,14 +132,17 @@ final class AppLockManager: ObservableObject {
         guard passcode.count >= 6 else {
             throw SetupError.passcodeTooShort
         }
-        
-    let hashed = hash(passcode)
+        guard userProfile != nil else {
+            throw SetupError.profileIncomplete
+        }
+
+        let hashed = hash(passcode)
         do {
             try keychain.save(hashed, for: passcodeKey)
         } catch {
             throw SetupError.storageFailure("Unable to store passcode securely")
         }
-        
+
         defaults.set(true, forKey: onboardingKey)
         defaults.set(enableBiometrics && canUseBiometrics(), forKey: biometricsKey)
         
@@ -236,6 +278,27 @@ final class AppLockManager: ObservableObject {
         let passphrase = try generateRecoveryPassphrase()
         try storeRecoveryPassphrase(words: passphrase)
         return passphrase
+    }
+
+    func registerUserProfile(_ profile: UserProfile) throws {
+        let trimmedFirst = profile.normalizedFirstName
+        let trimmedLast = profile.normalizedLastName
+        guard !trimmedFirst.isEmpty, !trimmedLast.isEmpty else {
+            throw SetupError.profileIncomplete
+        }
+        let cleanedProfile = UserProfile(firstName: trimmedFirst, lastName: trimmedLast, role: profile.role)
+        do {
+            let data = try JSONEncoder().encode(cleanedProfile)
+            defaults.set(data, forKey: profileKey)
+            userProfile = cleanedProfile
+        } catch {
+            throw SetupError.storageFailure("Unable to store profile securely")
+        }
+    }
+    
+    func clearUserProfile() {
+        defaults.removeObject(forKey: profileKey)
+        userProfile = nil
     }
     
     private func initializeWalletIfNeeded() async throws {

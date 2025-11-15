@@ -125,6 +125,8 @@ struct SecuritySetupView: View {
                 errorMessage = reason
             } catch AppLockManager.SetupError.walletInitializationFailure(let reason) {
                 errorMessage = "Wallet initialization failed: \(reason)"
+            } catch AppLockManager.SetupError.profileIncomplete {
+                errorMessage = "Please provide your name and role before completing setup."
             } catch {
                 errorMessage = "Unexpected error: \(error.localizedDescription)"
             }

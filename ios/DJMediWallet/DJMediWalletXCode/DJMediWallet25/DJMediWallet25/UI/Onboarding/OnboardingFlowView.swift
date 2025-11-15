@@ -15,8 +15,18 @@ struct OnboardingFlowView: View {
     @State private var passphrase: [String] = []
     @State private var confirmationIndices: [Int] = []
     @State private var passphraseError: String?
+    @State private var didConfirmPassphrase = false
+    @State private var firstName = ""
+    @State private var lastName = ""
+    @State private var selectedRole: AppLockManager.UserProfile.Role = .patient
+    @State private var profileError: String?
+    @State private var hasStoredProfile = false
     
     private let totalSteps = 5
+    
+    private var canCompleteSetup: Bool {
+        hasAcknowledgedCompliance && didConfirmPassphrase && hasStoredProfile
+    }
     
     var body: some View {
         VStack(spacing: 24) {
@@ -25,9 +35,13 @@ struct OnboardingFlowView: View {
                 .padding(.horizontal)
             
             TabView(selection: $currentStep) {
-                WelcomeStep {
-                    advance()
-                }
+                WelcomeStep(
+                    firstName: $firstName,
+                    lastName: $lastName,
+                    selectedRole: $selectedRole,
+                    errorMessage: profileError,
+                    onContinue: saveProfileAndAdvance
+                )
                 .tag(0)
                 
                 ComplianceStep(hasAccepted: $hasAcknowledgedCompliance) {
@@ -43,6 +57,7 @@ struct OnboardingFlowView: View {
                     advance()
                 } onGenerate: {
                     generatePassphraseIfNeeded(force: true)
+                    didConfirmPassphrase = false
                 }
                 .tag(2)
                 
@@ -50,6 +65,7 @@ struct OnboardingFlowView: View {
                     do {
                         try lockManager.storeRecoveryPassphrase(words: passphrase)
                         passphraseError = nil
+                        didConfirmPassphrase = true
                         advance()
                     } catch {
                         passphraseError = "Unable to store passphrase. Please try again."
@@ -59,7 +75,7 @@ struct OnboardingFlowView: View {
                 }
                 .tag(3)
                 
-                SecuritySetupView(canComplete: hasAcknowledgedCompliance) {
+                SecuritySetupView(canComplete: canCompleteSetup) {
                     retreat()
                 }
                 .tag(4)
@@ -67,9 +83,23 @@ struct OnboardingFlowView: View {
             .tabViewStyle(.page(indexDisplayMode: .always))
             .animation(.easeInOut, value: currentStep)
         }
-        .ignoresSafeArea(edges: .bottom)
         .background(Color(.systemBackground))
-        .onAppear { generatePassphraseIfNeeded(force: false) }
+        .onAppear {
+            if let storedProfile = lockManager.userProfile {
+                firstName = storedProfile.firstName
+                lastName = storedProfile.lastName
+                selectedRole = storedProfile.role
+                hasStoredProfile = true
+            } else {
+                firstName = ""
+                lastName = ""
+                selectedRole = .patient
+                hasStoredProfile = false
+            }
+            generatePassphraseIfNeeded(force: false)
+            didConfirmPassphrase = false
+            profileError = nil
+        }
     }
     
     private func advance() {
@@ -82,6 +112,25 @@ struct OnboardingFlowView: View {
     private func retreat() {
         if currentStep > 0 {
             currentStep -= 1
+            if currentStep == 0 {
+                profileError = nil
+            }
+        }
+    }
+
+    private func saveProfileAndAdvance() {
+        profileError = nil
+        let profile = AppLockManager.UserProfile(firstName: firstName, lastName: lastName, role: selectedRole)
+        do {
+            try lockManager.registerUserProfile(profile)
+            hasStoredProfile = true
+            advance()
+        } catch AppLockManager.SetupError.profileIncomplete {
+            profileError = "Please enter your first and last name."
+        } catch AppLockManager.SetupError.storageFailure(let message) {
+            profileError = message
+        } catch {
+            profileError = "Unable to store profile."
         }
     }
     
@@ -91,6 +140,7 @@ struct OnboardingFlowView: View {
             passphrase = try lockManager.generateRecoveryPassphrase()
             passphraseError = nil
             confirmationIndices.removeAll()
+            didConfirmPassphrase = false
         } catch {
             passphraseError = "Unable to generate passphrase."
         }
@@ -119,36 +169,113 @@ private enum PassphraseIndexGenerator {
 }
 
 private struct WelcomeStep: View {
+    @Binding var firstName: String
+    @Binding var lastName: String
+    @Binding var selectedRole: AppLockManager.UserProfile.Role
+    let errorMessage: String?
     let onContinue: () -> Void
+    @FocusState private var focusedField: Field?
+    
+    private enum Field {
+        case firstName
+        case lastName
+    }
+    
+    private var isFormValid: Bool {
+        !firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !lastName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
     
     var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            Image(systemName: "heart.text.square.fill")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 96, height: 96)
-                .foregroundColor(.blue)
-            Text("Welcome to DJ Medi Wallet")
-                .font(.title)
-                .fontWeight(.semibold)
-                .multilineTextAlignment(.center)
-            Text("This wallet aligns with the EU Digital Identity framework and keeps your health credentials secure on your device.")
-                .multilineTextAlignment(.center)
-                .foregroundColor(.secondary)
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: 24) {
+                    Image(systemName: "heart.text.square.fill")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 96, height: 96)
+                        .foregroundColor(.blue)
+                        .padding(.top, 48)
+                    Text("Welcome to DJ Medi Wallet")
+                        .font(.title)
+                        .fontWeight(.semibold)
+                        .multilineTextAlignment(.center)
+                    Text("Tell us who you are so we can personalise your wallet setup.")
+                        .multilineTextAlignment(.center)
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal)
+                    VStack(spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("First Name")
+                                .font(.headline)
+                            TextField("Enter first name", text: $firstName)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled(false)
+                                .focused($focusedField, equals: .firstName)
+                                .submitLabel(.next)
+                                .onSubmit { focusedField = .lastName }
+                                .padding()
+                                .background(Color(.secondarySystemBackground))
+                                .cornerRadius(10)
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Last Name")
+                                .font(.headline)
+                            TextField("Enter last name", text: $lastName)
+                                .textInputAutocapitalization(.words)
+                                .autocorrectionDisabled(false)
+                                .focused($focusedField, equals: .lastName)
+                                .submitLabel(.done)
+                                .onSubmit { focusedField = nil }
+                                .padding()
+                                .background(Color(.secondarySystemBackground))
+                                .cornerRadius(10)
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Role")
+                                .font(.headline)
+                            Picker("Role", selection: $selectedRole) {
+                                ForEach(AppLockManager.UserProfile.Role.allCases) { role in
+                                    Text(role.displayName).tag(role)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                        }
+                    }
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
+                            .multilineTextAlignment(.center)
+                    }
+                    Spacer(minLength: 32)
+                }
                 .padding(.horizontal)
-            Spacer()
+            }
+            .scrollDismissesKeyboard(.interactively)
+            .simultaneousGesture(TapGesture().onEnded { focusedField = nil })
+        }
+        .safeAreaInset(edge: .bottom) {
             Button(action: onContinue) {
-                Text("Get Started")
+                Text("Continue")
                     .font(.headline)
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.blue)
+                    .background(isFormValid ? Color.blue : Color.gray.opacity(0.4))
                     .foregroundColor(.white)
                     .cornerRadius(12)
-                    .padding(.horizontal)
             }
-            Spacer()
+            .disabled(!isFormValid)
+            .padding(.horizontal)
+            .padding(.vertical, 16)
+            .background(.ultraThinMaterial)
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    focusedField = nil
+                }
+            }
         }
     }
 }
@@ -272,7 +399,7 @@ private struct PassphraseConfirmStep: View {
     @State private var inputs: [Int: String] = [:]
     
     var body: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Confirm Passphrase")
@@ -299,6 +426,9 @@ private struct PassphraseConfirmStep: View {
                 }
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .safeAreaInset(edge: .bottom) {
             HStack {
                 Button(action: onBack) {
                     Text("Back")
@@ -321,7 +451,8 @@ private struct PassphraseConfirmStep: View {
                 .disabled(!isComplete)
             }
             .padding(.horizontal)
-            .padding(.bottom, 24)
+            .padding(.vertical, 16)
+            .background(.ultraThinMaterial)
         }
         .onChange(of: indices) { _ in
             inputs.removeAll()

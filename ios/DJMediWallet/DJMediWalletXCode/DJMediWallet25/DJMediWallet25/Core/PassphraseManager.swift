@@ -16,12 +16,12 @@ enum PassphraseError: Error {
 /// Responsible for creating pronounceable, high-entropy passphrases
 struct PassphraseManager {
     static let shared = PassphraseManager()
-    private let wordCount = 12
-    private let dictionarySize = PassphraseDictionary.words.count
     
     func generatePassphrase(wordCount: Int = 12) throws -> [String] {
         guard wordCount > 0 else { throw PassphraseError.invalidWordCount }
         let words = PassphraseDictionary.words
+        let dictionarySize = words.count
+        guard dictionarySize > 0 else { throw PassphraseError.entropyUnavailable }
         var result: [String] = []
         for _ in 0..<wordCount {
             let index = try randomIndex(max: dictionarySize)
@@ -37,6 +37,7 @@ struct PassphraseManager {
     }
     
     private func randomIndex(max: Int) throws -> Int {
+        precondition(max > 0, "Dictionary must contain at least one word")
         var number: UInt32 = 0
         let status = SecRandomCopyBytes(kSecRandomDefault, MemoryLayout<UInt32>.size, &number)
         guard status == errSecSuccess else { throw PassphraseError.entropyUnavailable }
@@ -45,25 +46,32 @@ struct PassphraseManager {
 }
 
 private enum PassphraseDictionary {
-    private static let consonants = [
-        "b", "c", "d", "f", "g", "h", "k", "l",
-        "m", "n", "p", "r", "s", "t", "v", "z"
-    ]
-    private static let vowels = ["a", "e", "i", "o", "u", "y", "ae", "io"]
+    private final class PassphraseBundleMarker {}
     
     static let words: [String] = {
-        var list: [String] = []
-        list.reserveCapacity(4096)
-        for c1 in consonants {
-            for v1 in vowels {
-                for c2 in consonants {
-                    for v2 in vowels {
-                        let word = c1 + v1 + c2 + v2
-                        list.append(word)
-                    }
+        let bundleCandidates: [Bundle] = [
+            Bundle.main,
+            Bundle(for: PassphraseBundleMarker.self)
+        ]
+        for bundle in bundleCandidates {
+            if let url = bundle.url(forResource: "passphrase_wordlist", withExtension: "txt"),
+               let contents = try? String(contentsOf: url, encoding: .utf8) {
+                let candidates = contents
+                    .split(whereSeparator: { $0.isWhitespace })
+                    .map { String($0).lowercased() }
+                    .filter { !$0.isEmpty }
+                if !candidates.isEmpty {
+                    return candidates
                 }
             }
         }
-        return list
+        // Fallback list (subset of BIP39 words) if resource not available
+        return [
+            "apple", "balance", "capture", "define", "eager", "fabric",
+            "galaxy", "harbor", "icon", "jazz", "kernel", "liberty",
+            "magnet", "nature", "oasis", "paddle", "quality", "radar",
+            "saddle", "talent", "umbrella", "vacuum", "whisper", "yonder",
+            "zephyr"
+        ]
     }()
 }
