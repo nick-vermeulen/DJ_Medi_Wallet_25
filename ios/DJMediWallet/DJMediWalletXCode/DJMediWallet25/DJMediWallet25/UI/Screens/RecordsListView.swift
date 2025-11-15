@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct RecordsListView: View {
     @EnvironmentObject var walletManager: WalletManager
@@ -58,6 +59,12 @@ struct RecordsListView: View {
                 } message: {
                     Text(errorMessage ?? "")
                 }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .testDataFixturesDidChange)) { _ in
+            Task {
+                _ = await lockManager.loadUserProfile()
+                await refreshRecords()
+            }
         }
     }
 
@@ -173,8 +180,10 @@ struct RecordsListView: View {
                 fetchedCredentials = try await walletManager.getAllCredentialsAsync()
             }
 
+            let filteredCredentials = filterCredentials(fetchedCredentials, for: profile?.role)
+
             await MainActor.run {
-                records = fetchedCredentials.map { RecordItem(from: $0) }
+                records = filteredCredentials.map { RecordItem(from: $0) }
                 isLoading = false
             }
         } catch {
@@ -205,6 +214,21 @@ struct RecordsListView: View {
     private func deleteRecord(_ record: RecordItem) {
         guard let index = records.firstIndex(where: { $0.id == record.id }) else { return }
         deleteRecords(at: IndexSet(integer: index))
+    }
+
+    private func filterCredentials(_ credentials: [MedicalCredential], for role: AppLockManager.UserProfile.Role?) -> [MedicalCredential] {
+        guard let role else { return credentials }
+        switch role {
+        case .patient:
+            return credentials.filter { credential in
+                let resourceType = credential.fhirResource?.resourceType
+                let resourceIsTask = resourceType?.caseInsensitiveCompare("Task") == .orderedSame
+                let typeIndicatesTask = credential.type.localizedCaseInsensitiveContains("task")
+                return resourceIsTask == false && typeIndicatesTask == false
+            }
+        case .practitioner:
+            return credentials
+        }
     }
 }
 

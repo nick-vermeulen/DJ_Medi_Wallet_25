@@ -24,6 +24,7 @@ final class TestDataManager {
         try await walletManager.removeAllCredentials()
         try await walletManager.importCredentials(credentials)
         try await persistState(FixtureState(role: role, loadedAt: Date()))
+        notifyFixturesDidChange()
         logger.info("Seeded \(credentials.count) fixtures for role \(role.rawValue, privacy: .public)")
     }
 
@@ -39,6 +40,7 @@ final class TestDataManager {
         do {
             try await walletManager.removeAllCredentials()
             try await clearState()
+            notifyFixturesDidChange()
             logger.info("Cleared fixtures after role switch from \(oldRole?.rawValue ?? "none", privacy: .public) to \(newRole.rawValue, privacy: .public)")
         } catch {
             logger.error("Failed to clear fixtures after role switch: \(error.localizedDescription, privacy: .public)")
@@ -131,6 +133,7 @@ final class TestDataManager {
 
             let fixtures = try loadFixtures(for: role)
             try await walletManager.importCredentials(fixtures)
+            notifyFixturesDidChange()
             logger.info("Rehydrated \(fixtures.count) fixtures for role \(role.rawValue, privacy: .public)")
         } catch {
             logger.error("Failed to rehydrate fixtures for role \(role.rawValue, privacy: .public): \(error.localizedDescription, privacy: .public)")
@@ -144,6 +147,10 @@ final class TestDataManager {
             logger.error("Unable to read fixture state: \(error.localizedDescription, privacy: .public)")
             return nil
         }
+    }
+
+    private func notifyFixturesDidChange() {
+        NotificationCenter.default.post(name: .testDataFixturesDidChange, object: nil)
     }
 }
 
@@ -161,4 +168,8 @@ extension TestDataManager {
             }
         }
     }
+}
+
+extension Notification.Name {
+    static let testDataFixturesDidChange = Notification.Name("TestDataFixturesDidChange")
 }
