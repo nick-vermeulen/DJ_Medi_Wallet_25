@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Combine
 import LocalAuthentication
 import CryptoKit
 
@@ -35,11 +36,11 @@ final class AppLockManager: ObservableObject {
     private let passcodeKey = "com.djmediwallet.passcode.hash"
     
     init(
-        walletManager: WalletManager = .shared,
+        walletManager: WalletManager? = nil,
         keychain: KeychainService = KeychainService(),
         defaults: UserDefaults = .standard
     ) {
-        self.walletManager = walletManager
+        self.walletManager = walletManager ?? WalletManager.shared
         self.keychain = keychain
         self.defaults = defaults
         
@@ -118,16 +119,20 @@ final class AppLockManager: ObservableObject {
     }
     
     func unlock(withPasscode passcode: String) {
-        guard let stored = try? keychain.read(passcodeKey), let storedData = stored else {
-            lastErrorMessage = "Passcode not set."
-            return
-        }
-        let provided = hash(passcode)
-        if storedData == provided {
-            lastErrorMessage = nil
-            lockState = .unlocked
-        } else {
-            lastErrorMessage = "Incorrect passcode."
+        do {
+            guard let storedData = try keychain.read(passcodeKey) else {
+                lastErrorMessage = "Passcode not set."
+                return
+            }
+            let provided = hash(passcode)
+            if storedData == provided {
+                lastErrorMessage = nil
+                lockState = .unlocked
+            } else {
+                lastErrorMessage = "Incorrect passcode."
+            }
+        } catch {
+            lastErrorMessage = "Unable to read stored passcode."
         }
     }
     

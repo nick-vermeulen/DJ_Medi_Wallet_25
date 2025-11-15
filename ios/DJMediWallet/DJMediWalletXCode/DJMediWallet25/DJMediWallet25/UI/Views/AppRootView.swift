@@ -15,9 +15,13 @@ struct AppRootView: View {
         Group {
             switch lockManager.lockState {
             case .onboarding:
-                OnboardingFlowView()
+                NavigationStack {
+                    OnboardingFlowView()
+                }
             case .locked:
-                UnlockView()
+                NavigationStack {
+                    UnlockView()
+                }
             case .unlocked:
                 ContentView()
             }

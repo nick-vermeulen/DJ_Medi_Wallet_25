@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import LocalAuthentication
 
 struct UnlockView: View {
     @EnvironmentObject private var lockManager: AppLockManager

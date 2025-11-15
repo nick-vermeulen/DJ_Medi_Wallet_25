@@ -53,7 +53,8 @@ struct KeychainService {
     }
     
     func contains(_ key: String) -> Bool {
-        (try? read(key)) != nil
+        guard let value = try? read(key) else { return false }
+        return value != nil
     }
     
     private func query(for key: String) -> [String: Any] {

@@ -19,76 +19,56 @@ struct SecuritySetupView: View {
     @State private var biometricsAvailable = false
     @State private var isProcessing = false
     @State private var errorMessage: String?
+    @FocusState private var focusedField: FocusableField?
+
+    private enum FocusableField {
+        case passcode
+        case confirm
+    }
     
     var body: some View {
-        VStack(spacing: 24) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    Text("Secure Your Wallet")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Text("Choose a six-digit passcode to protect access. If your device supports biometrics you can enable Face ID or Touch ID for quicker unlocks.")
-                        .foregroundColor(.secondary)
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Create Passcode")
-                            .font(.headline)
-                        SecureField("6-digit passcode", text: $passcode)
-                            .keyboardType(.numberPad)
-                            .textContentType(.newPassword)
-                            .padding()
-                            .background(Color(.secondarySystemBackground))
-                            .cornerRadius(10)
-                        SecureField("Confirm passcode", text: $confirmPasscode)
-                            .keyboardType(.numberPad)
-                            .textContentType(.newPassword)
-                            .padding()
-                            .background(Color(.secondarySystemBackground))
-                            .cornerRadius(10)
-                    }
-                    if biometricsAvailable {
-                        Toggle(isOn: $allowBiometrics) {
-                            Text("Enable \(biometricLabel())")
-                                .fontWeight(.medium)
-                        }
-                        .toggleStyle(SwitchToggleStyle(tint: .blue))
-                    }
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                    }
-                }
-                .padding()
-            }
-            HStack {
-                Button(action: onBack) {
-                    Text("Back")
-                        .frame(maxWidth: .infinity)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Secure Your Wallet")
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Text("Choose a six-digit passcode to protect access. If your device supports biometrics you can enable Face ID or Touch ID for quicker unlocks.")
+                    .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Create Passcode")
+                        .font(.headline)
+                    SecureField("6-digit passcode", text: $passcode)
+                        .keyboardType(.numberPad)
+                        .textContentType(.newPassword)
                         .padding()
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(Color.blue, lineWidth: 1)
-                        )
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(10)
+                        .focused($focusedField, equals: .passcode)
+                    SecureField("Confirm passcode", text: $confirmPasscode)
+                        .keyboardType(.numberPad)
+                        .textContentType(.newPassword)
+                        .padding()
+                        .background(Color(.secondarySystemBackground))
+                        .cornerRadius(10)
+                        .focused($focusedField, equals: .confirm)
                 }
-                Button(action: completeSetup) {
-                    if isProcessing {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                    } else {
-                        Text("Complete Setup")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
+                if biometricsAvailable {
+                    Toggle(isOn: $allowBiometrics) {
+                        Text("Enable \(biometricLabel())")
+                            .fontWeight(.medium)
                     }
+                    .toggleStyle(SwitchToggleStyle(tint: .blue))
                 }
-                .background(isActionEnabled ? Color.blue : Color.gray.opacity(0.4))
-                .foregroundColor(.white)
-                .cornerRadius(12)
-                .disabled(!isActionEnabled || isProcessing)
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundColor(.red)
+                }
             }
-            .padding(.horizontal)
-            .padding(.bottom, 24)
+            .padding()
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
+            actionBar
         }
         .onAppear {
             biometricsAvailable = lockManager.canUseBiometrics()
@@ -100,6 +80,15 @@ struct SecuritySetupView: View {
         .onChange(of: confirmPasscode) { newValue in
             confirmPasscode = sanitized(newValue)
         }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    focusedField = nil
+                }
+            }
+        }
+        .simultaneousGesture(TapGesture().onEnded { focusedField = nil })
     }
     
     private var isActionEnabled: Bool {
@@ -125,6 +114,7 @@ struct SecuritySetupView: View {
         guard isActionEnabled else { return }
         errorMessage = nil
         isProcessing = true
+        focusedField = nil
         let selectedBiometrics = allowBiometrics && biometricsAvailable
         Task {
             do {
@@ -140,5 +130,40 @@ struct SecuritySetupView: View {
             }
             isProcessing = false
         }
+    }
+
+    private var actionBar: some View {
+        HStack {
+            Button(action: onBack) {
+                Text("Back")
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(Color.blue, lineWidth: 1)
+                    )
+            }
+            Button(action: completeSetup) {
+                if isProcessing {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle())
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                } else {
+                    Text("Complete Setup")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                }
+            }
+            .background(isActionEnabled ? Color.blue : Color.gray.opacity(0.4))
+            .foregroundColor(.white)
+            .cornerRadius(12)
+            .disabled(!isActionEnabled || isProcessing)
+        }
+        .padding(.horizontal)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .background(.regularMaterial)
     }
 }
