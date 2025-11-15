@@ -149,9 +149,12 @@ struct SettingsView: View {
         Section {
             VStack(alignment: .center, spacing: 4) {
                 Text("Made with Care in the Channel Islands")
-                Text("© Lazy-Jack.Com")
+                    .font(.footnote)
+                Text("© Lazy-Jack.com")
+                    .font(.footnote)
                 Text("\"So long and thanks for all the fish...\"")
-                    .italic().bold()
+                    .font(.footnote.weight(.bold)) 
+                    .italic()
             }
             .font(.footnote)
             .foregroundColor(.secondary)
