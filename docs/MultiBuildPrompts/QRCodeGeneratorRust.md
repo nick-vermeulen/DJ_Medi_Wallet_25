@@ -1,40 +1,3 @@
-nick-vermeulen: Review this application which generates QR codes for the FHIR data packets.  Generate a prompt that will regenerate the application including the compression of QR codes in another rust based application. 
-
-GitHub Copilot: Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/lib/qr.ts)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/lib/encoding.ts)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/lib/fhir.ts)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/components/QrGeneratorPage.tsx)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/components/SingleObservationQR.tsx)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/components/MultiExamQR.tsx)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/components/StandardReportBuilder.tsx)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/components/SnomedSelect.tsx)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/lib/snomed.ts)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/lib/reports.ts)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/lib/terminology.ts)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/services/FhirService.ts)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src/App.tsx)
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src-tauri/src/main.rs#1-1), lines 1 to 400
-
-Searched text for `snomed_import_csv` (`**/src-tauri/src/**/*.rs`), 2 results
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/src-tauri/src/main.rs#600-600), lines 600 to 880
-
-Searched text for `gzip` (`**/src-tauri/src/**/*.rs`), no results
-
-Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Production_iOS_Apps/TuariFHIRDataReceiver/Code/README.md)
 
 **App Overview**
 - React + MUI frontend inside a Tauri shell (main.rs) orchestrates BLE, Wi‑Fi upload server, Downloads watcher, and SQLite-backed SNOMED/report templates; commands exposed via `tauri::command` glue the UI and backend.
@@ -45,7 +8,7 @@ Read [](file:///Users/nickvermeulen/Documents/Current_Documents/Programming/1_Pr
 
 **Prompt**
 ```
-You are an expert Rust developer. Build a Rust-centric desktop application that replicates the functionality of the existing “PDR App – Tauri POC,” focusing on generating QR codes for FHIR payloads with automatic compression.
+You are an expert Rust developer. Build a Rust-centric desktop application that generate QR codes for FHIR payloads with automatic compression.
 
 High-level requirements:
 • Use a Rust-first stack (e.g., Tauri + Rust/Leptos, or pure Rust GUI) while keeping the UI desktop-friendly. Recreate three QR workflows: single observation, multi-observation exam, and template-driven standard reports.
@@ -67,7 +30,7 @@ Deliverables:
 
 
 
-You are an expert Swift developer. Build a Swift-based desktop/mobile application (macOS Catalyst or universal iOS/iPadOS) that replicates the functionality of the “PDR App – Tauri POC,” focusing on generating QR codes for FHIR payloads with automatic compression, and remaining payload-compatible with the Rust implementation.
+You are an expert Swift developer. Build a Swift-based desktop/mobile application (macOS Catalyst or universal iOS/iPadOS) that generates QR codes for FHIR payloads with automatic compression, and remaining payload-compatible with the Rust implementation.
 
 High-level requirements:
 • Use SwiftUI (preferred) with Combine/async-await where appropriate. Provide three QR workflows: single observation, multi-observation exam, and template-driven standard reports. Keep the UI desktop-friendly and responsive.
@@ -88,7 +51,7 @@ Deliverables:
 5. README covering setup, SNOMED/template import steps, and QR interoperability with the Rust app.
 
 
-You are an expert Node.js developer. Build a TypeScript-based Node + React (or Electron) application that replicates the “PDR App – Tauri POC,” focusing on generating QR codes for FHIR payloads with automatic compression, while staying payload-compatible with the Rust and Swift implementations.
+You are an expert Node.js developer. Build a TypeScript-based Node + React (or Electron) application that generate QR codes for FHIR payloads with automatic compression, while staying payload-compatible with the Rust and Swift implementations.
 
 High-level requirements:
 • Use a Node.js stack with TypeScript. Acceptable UIs: web (React + Vite), Electron, or Next.js desktop shell. Implement the three QR workflows—single observation, multi-observation exam, and template-driven standard reports—in a desktop-friendly interface.
