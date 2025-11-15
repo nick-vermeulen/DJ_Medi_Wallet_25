@@ -9,6 +9,7 @@ import Foundation
 import Combine
 import LocalAuthentication
 import CryptoKit
+import Supabase
 
 @MainActor
 final class AppLockManager: ObservableObject {
@@ -112,6 +113,7 @@ final class AppLockManager: ObservableObject {
     private let lockTimeoutKey = "com.djmediwallet.lock.timeout"
 
     private var lockWorkItem: DispatchWorkItem?
+    private var supabaseAuthTask: Task<Void, Never>?
     
     init(
         walletManager: WalletManager? = nil,
@@ -137,6 +139,12 @@ final class AppLockManager: ObservableObject {
             guard let self else { return }
             _ = await self.loadUserProfile()
         }
+
+        configureSupabaseAuthMonitoring()
+    }
+
+    deinit {
+        supabaseAuthTask?.cancel()
     }
     
     var hasCompletedOnboarding: Bool {
@@ -326,7 +334,13 @@ final class AppLockManager: ObservableObject {
             throw SetupError.profileIncomplete
         }
         let consentDate = profile.consentTimestamp
-    let cleanedProfile = UserProfile(firstName: trimmedFirst, lastName: trimmedLast, role: profile.role, consentTimestamp: consentDate, externalUserId: profile.externalUserId)
+        var cleanedProfile = UserProfile(firstName: trimmedFirst, lastName: trimmedLast, role: profile.role, consentTimestamp: consentDate, externalUserId: profile.externalUserId)
+
+        if cleanedProfile.externalUserId == nil {
+            if let supabaseId = try? await SupabaseService.shared.currentUserId() {
+                cleanedProfile.externalUserId = supabaseId.uuidString
+            }
+        }
         do {
             try await storeProfileMetadata(cleanedProfile)
             persistProfileToDefaults(cleanedProfile)
@@ -385,6 +399,78 @@ final class AppLockManager: ObservableObject {
         let trimmed = passcode.trimmingCharacters(in: .whitespacesAndNewlines)
         let digest = SHA256.hash(data: Data(trimmed.utf8))
         return Data(digest)
+    }
+
+    private func configureSupabaseAuthMonitoring() {
+        supabaseAuthTask?.cancel()
+        supabaseAuthTask = Task.detached { [weak self] in
+            do {
+                let stream = try await SupabaseService.shared.authStateChangeStream()
+                for await change in stream {
+                    guard let manager = await MainActor.run(body: { self }) else { return }
+                    await manager.processSupabaseAuthEvent(event: change.event, session: change.session)
+                }
+            } catch {
+                // Ignore configuration errors until Supabase is available.
+            }
+        }
+    }
+
+    @MainActor
+    private func processSupabaseAuthEvent(event: AuthChangeEvent, session: Session?) async {
+        switch event {
+        case .initialSession, .signedIn, .tokenRefreshed, .userUpdated, .mfaChallengeVerified:
+            guard let session else { return }
+            await handleSupabaseSession(session)
+        case .signedOut, .userDeleted:
+            await handleSupabaseSignOut()
+        case .passwordRecovery:
+            break
+        }
+    }
+
+    @MainActor
+    private func handleSupabaseSession(_ session: Session) async {
+        let supabaseUserId = session.user.id
+        await persistExternalUserIdIfNeeded(supabaseUserId)
+        do {
+            _ = try await walletManager.syncPatientRecordsFromSupabase(patientId: supabaseUserId)
+            if let message = lastErrorMessage, message.contains("Supabase") {
+                lastErrorMessage = nil
+            }
+        } catch {
+            lastErrorMessage = "Unable to refresh records from Supabase: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func handleSupabaseSignOut() async {
+        guard var profile = userProfile, profile.externalUserId != nil else { return }
+        profile.externalUserId = nil
+        do {
+            try await storeProfileMetadata(profile)
+            persistProfileToDefaults(profile)
+            userProfile = profile
+        } catch {
+            lastErrorMessage = "Unable to clear Supabase link: \(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func persistExternalUserIdIfNeeded(_ identifier: UUID) async {
+        let externalIdentifier = identifier.uuidString
+        guard var profile = userProfile else { return }
+        guard profile.externalUserId != externalIdentifier else { return }
+
+        profile.externalUserId = externalIdentifier
+
+        do {
+            try await storeProfileMetadata(profile)
+            persistProfileToDefaults(profile)
+            userProfile = profile
+        } catch {
+            lastErrorMessage = "Unable to store Supabase link: \(error.localizedDescription)"
+        }
     }
 
     private func storeProfileMetadata(_ profile: UserProfile) async throws {

@@ -13,17 +13,23 @@ struct SupabaseConfig {
     let anonKey: String
 
     /// Attempts to load Supabase configuration values from the provided bundle.
-    /// - Parameter bundle: The bundle to read configuration values from. Defaults to `.main`.
+    /// - Parameter bundle: The bundle to read configuration values from.
     /// - Returns: A configured `SupabaseConfig` instance if both URL and anon key are present and valid.
     static func load(from bundle: Bundle) -> SupabaseConfig? {
-        guard let urlString = bundle.object(forInfoDictionaryKey: "postgresql://postgres.mpaxzasbhhfigidorgle:Hackathon2025@aws-1-eu-west-1.pooler.supabase.com:5432/postgres") as? String,
-              let anonKey = bundle.object(forInfoDictionaryKey: "JEbwLuq30jtct/3yta2yKN4n9bAxOAC3vzQ8PKLI/feNN93syWLw8u/Nrg7XB83dQylNIZr4kpIATXK0vIMnYg==") as? String,
-              let trimmedURL = urlString.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
-              let trimmedKey = anonKey.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
-              let resolvedURL = URL(string: trimmedURL) else {
+        let infoPlistURL = (bundle.object(forInfoDictionaryKey: "SupabaseURL") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+        let infoPlistAnonKey = (bundle.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String)?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+
+        let environment = ProcessInfo.processInfo.environment
+        let environmentURL = environment["SUPABASE_URL"]?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+        let environmentAnonKey = environment["SUPABASE_ANON_KEY"]?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
+
+        guard let urlString = infoPlistURL ?? environmentURL,
+              let anonKey = infoPlistAnonKey ?? environmentAnonKey,
+              let resolvedURL = URL(string: urlString) else {
             return nil
         }
-        return SupabaseConfig(url: resolvedURL, anonKey: trimmedKey)
+
+        return SupabaseConfig(url: resolvedURL, anonKey: anonKey)
     }
 
     /// Loads configuration values from the application bundle without relying on main-actor isolated APIs.

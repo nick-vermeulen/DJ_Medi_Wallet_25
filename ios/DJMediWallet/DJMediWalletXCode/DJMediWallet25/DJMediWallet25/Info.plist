@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>SupabaseAnonKey</key>
-	<string>SUPABASE_ANON_KEY</string>
+	<string>JEbwLuq30jtct/3yta2yKN4n9bAxOAC3vzQ8PKLI/feNN93syWLw8u/Nrg7XB83dQylNIZr4kpIATXK0vIMnYg==</string>
 	<key>SupabaseURL</key>
-	<string>https://YOUR-PROJECT.supabase.co</string>
+	<string>https://mpaxzasbhhfigidorgle.supabase.co</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

@@ -33,6 +33,9 @@ actor SupabaseService {
 
     private let client: SupabaseClient?
     private let decoder: JSONDecoder
+    private let maxRetryAttempts = 3
+    private let initialRetryDelay: UInt64 = 500_000_000 // 0.5s
+    private let maximumRetryDelay: UInt64 = 4_000_000_000 // 4s
 
     private init() {
         if let config = SupabaseConfig.loadDefault() {
@@ -62,7 +65,7 @@ actor SupabaseService {
 
     func fetchPatientRecords(for patientId: UUID) async throws -> [MedicalCredential] {
         let client = try requireClient()
-        do {
+        return try await performWithRetry { [self] in
             let response = try await client
                 .from("health_records")
                 .select()
@@ -71,11 +74,16 @@ actor SupabaseService {
                 .execute()
             let data = response.data
             guard data.isEmpty == false else { return [] }
-            let payload = try decoder.decode([SupabaseHealthRecord].self, from: data)
-            return payload.map { $0.toCredential() }
-        } catch {
-            throw map(error)
+            let payload = try self.decoder.decode([SupabaseHealthRecord].self, from: data)
+            return await MainActor.run {
+                payload.map { $0.toCredential() }
+            }
         }
+    }
+
+    func authStateChangeStream() async throws -> AsyncStream<(event: AuthChangeEvent, session: Session?)> {
+        let client = try requireClient()
+        return client.auth.authStateChanges
     }
 
     private func requireClient() throws -> SupabaseClient {
@@ -83,6 +91,45 @@ actor SupabaseService {
             throw ServiceError.misconfigured
         }
         return client
+    }
+
+    private func performWithRetry<T>(_ operation: @escaping () async throws -> T) async throws -> T {
+        var attempt = 0
+        var delay = initialRetryDelay
+        while true {
+            do {
+                return try await operation()
+            } catch {
+                attempt += 1
+                guard attempt < maxRetryAttempts, shouldRetry(error) else {
+                    throw map(error)
+                }
+                try await Task.sleep(nanoseconds: delay)
+                delay = min(delay * 2, maximumRetryDelay)
+            }
+        }
+    }
+
+    private func shouldRetry(_ error: Error) -> Bool {
+        if let serviceError = error as? ServiceError {
+            switch serviceError {
+            case .notAuthenticated, .invalidUserIdentifier, .misconfigured:
+                return false
+            case .requestFailed:
+                return true
+            }
+        }
+
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .timedOut, .cannotConnectToHost, .networkConnectionLost, .notConnectedToInternet:
+                return true
+            default:
+                return false
+            }
+        }
+
+        return true
     }
 
     private func map(_ error: Error) -> Error {
