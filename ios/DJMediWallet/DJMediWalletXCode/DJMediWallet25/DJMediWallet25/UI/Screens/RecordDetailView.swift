@@ -10,6 +10,8 @@ import SwiftUI
 struct RecordDetailView: View {
     let record: RecordItem
     @State private var isPresentingObservationQR = false
+    @State private var isPresentingConditionQR = false
+    @State private var isPresentingMedicationQR = false
     
     var body: some View {
         ScrollView {
@@ -59,8 +61,26 @@ struct RecordDetailView: View {
                         .padding(.top, 8)
                     case "Condition":
                         ConditionDetails(data: data)
+                        Button {
+                            isPresentingConditionQR = true
+                        } label: {
+                            Label("Generate QR Package", systemImage: "qrcode")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 8)
                     case "MedicationStatement":
                         MedicationDetails(data: data)
+                        Button {
+                            isPresentingMedicationQR = true
+                        } label: {
+                            Label("Generate QR Package", systemImage: "qrcode")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 8)
                     default:
                         EmptyView()
                     }
@@ -72,7 +92,41 @@ struct RecordDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $isPresentingObservationQR) {
             NavigationStack {
-                ObservationQRDetailView(record: record)
+                RecordQRDetailView(
+                    record: record,
+                    navigationTitle: "Observation QR",
+                    missingResourceMessage: "This record does not contain a FHIR Observation payload.") { item in
+                        guard let resource = item.credential.fhirResource else {
+                            throw FHIRResourceDecodingError.missingData
+                        }
+                        return try resource.makeObservationBundle(fallbackIdentifier: item.id)
+                    }
+            }
+        }
+        .sheet(isPresented: $isPresentingConditionQR) {
+            NavigationStack {
+                RecordQRDetailView(
+                    record: record,
+                    navigationTitle: "Condition QR",
+                    missingResourceMessage: "This record does not contain a FHIR Condition payload.") { item in
+                        guard let resource = item.credential.fhirResource else {
+                            throw FHIRResourceDecodingError.missingData
+                        }
+                        return try resource.makeConditionBundle(fallbackIdentifier: item.id)
+                    }
+            }
+        }
+        .sheet(isPresented: $isPresentingMedicationQR) {
+            NavigationStack {
+                RecordQRDetailView(
+                    record: record,
+                    navigationTitle: "Medication QR",
+                    missingResourceMessage: "This record does not contain a FHIR MedicationStatement payload.") { item in
+                        guard let resource = item.credential.fhirResource else {
+                            throw FHIRResourceDecodingError.missingData
+                        }
+                        return try resource.makeMedicationStatementBundle(fallbackIdentifier: item.id)
+                    }
             }
         }
     }

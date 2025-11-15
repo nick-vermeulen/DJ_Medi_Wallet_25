@@ -29,11 +29,12 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                informationSection
                 profileSection
                 securitySection
                 biometricsSection
                 recoverySection
-                supportSection
+                legalSection
             }
             .navigationTitle("Settings")
             .disabled(isSavingProfile)
@@ -133,14 +134,30 @@ struct SettingsView: View {
         }
     }
 
-    private var supportSection: some View {
-        Section(header: Text("Support"), footer: Text("Learn more about DJ Medi Wallet and how we protect your data.")) {
+    private var informationSection: some View {
+        Section(header: Text("Information"), footer: Text("Review our mission, policies, and usage guidance before adjusting sensitive settings.")) {
             NavigationLink(destination: AboutView()) {
                 Label("About DJ Medi Wallet", systemImage: "info.circle")
             }
             NavigationLink(destination: FAQView()) {
                 Label("FAQ & Guides", systemImage: "questionmark.circle")
             }
+        }
+    }
+
+    private var legalSection: some View {
+        Section {
+            VStack(alignment: .center, spacing: 4) {
+                Text("Made with Care in the Channel Islands")
+                Text("© Lazy-Jack.Com")
+                Text("\"So long and thanks for all the fish...\"")
+                    .italic().bold()
+            }
+            .font(.footnote)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 6)
+            .accessibilityElement(children: .combine)
         }
     }
 

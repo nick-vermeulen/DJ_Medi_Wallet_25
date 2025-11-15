@@ -31,6 +31,8 @@ public struct BundleEntry: Codable {
 public enum CodableResource: Codable {
     case observation(FHIRObservation)
     case diagnosticReport(DiagnosticReport)
+    case condition(Condition)
+    case medicationStatement(MedicationStatement)
 
     private enum CodingKeys: String, CodingKey {
         case resourceType
@@ -46,6 +48,12 @@ public enum CodableResource: Codable {
         case "DiagnosticReport":
             let report = try DiagnosticReport(from: decoder)
             self = .diagnosticReport(report)
+        case "Condition":
+            let condition = try Condition(from: decoder)
+            self = .condition(condition)
+        case "MedicationStatement":
+            let medication = try MedicationStatement(from: decoder)
+            self = .medicationStatement(medication)
         default:
             throw DecodingError.dataCorruptedError(forKey: .resourceType, in: container, debugDescription: "Unsupported resource type \(resourceType)")
         }
@@ -57,6 +65,10 @@ public enum CodableResource: Codable {
             try observation.encode(to: encoder)
         case .diagnosticReport(let report):
             try report.encode(to: encoder)
+        case .condition(let condition):
+            try condition.encode(to: encoder)
+        case .medicationStatement(let medication):
+            try medication.encode(to: encoder)
         }
     }
 }

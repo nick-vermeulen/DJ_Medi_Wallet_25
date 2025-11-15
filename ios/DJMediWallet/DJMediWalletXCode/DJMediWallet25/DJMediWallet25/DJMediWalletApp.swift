@@ -26,7 +26,18 @@ struct DJMediWalletApp25: App {
         self.snomedStore = snomedStore
         _snomedService = StateObject(wrappedValue: SNOMEDService(store: snomedStore))
         do {
-            modelContainer = try ModelContainer(for: ReportTemplate.self, ExamPreset.self)
+            let schema = Schema([
+                ReportTemplate.self,
+                ExamPreset.self
+            ])
+            let localConfiguration = ModelConfiguration(
+                schema: schema,
+                cloudKitDatabase: .none
+            )
+            modelContainer = try ModelContainer(
+                for: schema,
+                configurations: localConfiguration
+            )
         } catch {
             fatalError("Failed to initialize model container: \(error.localizedDescription)")
         }
