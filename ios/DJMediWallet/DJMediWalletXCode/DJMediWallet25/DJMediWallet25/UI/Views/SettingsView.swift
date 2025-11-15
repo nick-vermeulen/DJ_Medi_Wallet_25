@@ -32,6 +32,7 @@ struct SettingsView: View {
                 securitySection
                 biometricsSection
                 recoverySection
+                supportSection
             }
             .navigationTitle("Settings")
             .disabled(isSavingProfile)
@@ -77,9 +78,11 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 TextField("First Name", text: $firstName)
+                    .textContentType(.givenName)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled(false)
                 TextField("Last Name", text: $lastName)
+                    .textContentType(.familyName)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled(false)
                 Picker("Role", selection: roleSelectionBinding) {
@@ -129,6 +132,17 @@ struct SettingsView: View {
         }
     }
 
+    private var supportSection: some View {
+        Section(header: Text("Support"), footer: Text("Learn more about DJ Medi Wallet and how we protect your data.")) {
+            NavigationLink(destination: AboutView()) {
+                Label("About DJ Medi Wallet", systemImage: "info.circle")
+            }
+            NavigationLink(destination: FAQView()) {
+                Label("FAQ & Guides", systemImage: "questionmark.circle")
+            }
+        }
+    }
+
     private var profileFooter: some View {
         Group {
             if let profileErrorMessage {
@@ -136,7 +150,7 @@ struct SettingsView: View {
                     .foregroundColor(.red)
             } else if let storedProfile,
                       let consentDescription = consentDescription(for: storedProfile) {
-                Text("Consent captured \(consentDescription).")
+                Text("Consent captured \(consentDescription). You can review your data handling options in the FAQ.")
             } else {
                 Text("Provide your details so DJ Medi Wallet can tailor features for patients or practitioners.")
             }
