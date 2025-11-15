@@ -196,6 +196,16 @@ public class WalletManager: ObservableObject {
         return remoteCredentials
     }
 
+    // MARK: - Messaging
+
+    func createMessage(_ request: SupabaseService.MessageRequest) async throws -> SupabaseService.MessageResponse {
+        try await supabaseService.createMessage(request)
+    }
+
+    public func currentSupabaseUserId() async throws -> UUID {
+        try await supabaseService.currentUserId()
+    }
+
     private func synchronizeLocalStore(with remoteCredentials: [MedicalCredential]) async throws {
         let existing = try await getAllCredentialsAsync()
         let existingIds = Set(existing.map { $0.id })

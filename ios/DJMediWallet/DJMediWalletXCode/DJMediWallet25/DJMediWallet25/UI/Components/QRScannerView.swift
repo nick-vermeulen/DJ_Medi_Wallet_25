@@ -40,22 +40,55 @@ struct QRScannerView: UIViewControllerRepresentable {
 
         private let session = AVCaptureSession()
         private var previewLayer: AVCaptureVideoPreviewLayer?
+        private let metadataOutput = AVCaptureMetadataOutput()
+    private let overlayLayer = CAShapeLayer()
+    private let focusBorderLayer = CAShapeLayer()
+        private let instructionBackground = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+        private let instructionLabel: UILabel = {
+            let label = UILabel()
+            label.text = "Align the QR code within the frame"
+            label.textColor = .white
+            label.font = .preferredFont(forTextStyle: .callout)
+            label.textAlignment = .center
+            label.numberOfLines = 0
+            return label
+        }()
         private var didEmitResult = false
 
         override func viewDidLoad() {
             super.viewDidLoad()
             view.backgroundColor = .black
+            configureInstructionView()
             configureCamera()
+        }
+
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            didEmitResult = false
+            if session.isRunning == false {
+                session.startRunning()
+            }
         }
 
         override func viewDidLayoutSubviews() {
             super.viewDidLayoutSubviews()
             previewLayer?.frame = view.bounds
+            instructionBackground.frame = instructionFrame(for: view.bounds)
+            instructionLabel.frame = instructionBackground.contentView.bounds.insetBy(dx: 12, dy: 8)
+            updateOverlay()
         }
 
         override func viewWillDisappear(_ animated: Bool) {
             super.viewWillDisappear(animated)
             session.stopRunning()
+        }
+
+        private func configureInstructionView() {
+            instructionBackground.layer.cornerRadius = 12
+            instructionBackground.layer.masksToBounds = true
+            instructionBackground.layer.zPosition = 10
+            instructionBackground.contentView.addSubview(instructionLabel)
+            view.addSubview(instructionBackground)
         }
 
         private func configureCamera() {
@@ -97,7 +130,6 @@ struct QRScannerView: UIViewControllerRepresentable {
                 return
             }
 
-            let metadataOutput = AVCaptureMetadataOutput()
             if session.canAddOutput(metadataOutput) {
                 session.addOutput(metadataOutput)
                 metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
@@ -115,6 +147,8 @@ struct QRScannerView: UIViewControllerRepresentable {
             previewLayer.frame = view.layer.bounds
             view.layer.addSublayer(previewLayer)
             self.previewLayer = previewLayer
+
+            updateOverlay()
 
             session.startRunning()
         }
@@ -140,6 +174,57 @@ struct QRScannerView: UIViewControllerRepresentable {
             }
             onResult?(result)
             onResult = nil
+        }
+
+        private func updateOverlay() {
+            guard let previewLayer else { return }
+            let bounds = view.bounds
+            guard bounds.width > 0, bounds.height > 0 else { return }
+
+            let squareSize = min(bounds.width, bounds.height) * 0.6
+            let focusRect = CGRect(
+                x: (bounds.width - squareSize) / 2,
+                y: (bounds.height - squareSize) / 2,
+                width: squareSize,
+                height: squareSize
+            )
+
+            let path = UIBezierPath(rect: bounds)
+            let cutoutPath = UIBezierPath(roundedRect: focusRect, cornerRadius: 20)
+            path.append(cutoutPath)
+            path.usesEvenOddFillRule = true
+
+            overlayLayer.path = path.cgPath
+            overlayLayer.fillRule = .evenOdd
+            overlayLayer.fillColor = UIColor.black.withAlphaComponent(0.55).cgColor
+            overlayLayer.frame = bounds
+            overlayLayer.zPosition = 2
+
+            if overlayLayer.superlayer == nil {
+                view.layer.addSublayer(overlayLayer)
+            }
+
+            focusBorderLayer.path = UIBezierPath(roundedRect: focusRect, cornerRadius: 20).cgPath
+            focusBorderLayer.fillColor = UIColor.clear.cgColor
+            focusBorderLayer.strokeColor = UIColor.systemGreen.cgColor
+            focusBorderLayer.lineWidth = 3
+            focusBorderLayer.frame = bounds
+            focusBorderLayer.zPosition = 3
+
+            if focusBorderLayer.superlayer == nil {
+                view.layer.addSublayer(focusBorderLayer)
+            }
+
+            let convertedRect = previewLayer.metadataOutputRectConverted(fromLayerRect: focusRect)
+            metadataOutput.rectOfInterest = convertedRect
+        }
+
+        private func instructionFrame(for bounds: CGRect) -> CGRect {
+            let width = min(bounds.width * 0.85, 320)
+            let height: CGFloat = 56
+            let originX = (bounds.width - width) / 2
+            let originY = max(bounds.maxY - height - 32, bounds.minY + 24)
+            return CGRect(x: originX, y: originY, width: width, height: height)
         }
     }
 }

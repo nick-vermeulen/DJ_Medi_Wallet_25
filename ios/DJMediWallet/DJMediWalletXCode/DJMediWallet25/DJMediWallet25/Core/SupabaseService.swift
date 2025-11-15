@@ -32,6 +32,7 @@ actor SupabaseService {
     static let shared = SupabaseService()
 
     private var client: SupabaseClient?
+    private var configuration: SupabaseConfig?
     private let urlSession: URLSession
     private let maxRetryAttempts = 3
     private let initialRetryDelay: UInt64 = 500_000_000 // 0.5s
@@ -170,12 +171,63 @@ actor SupabaseService {
         }
     }
 
+    func createMessage(_ request: MessageRequest) async throws -> MessageResponse {
+        let client = try await requireClient()
+        guard let configuration else {
+            throw ServiceError.misconfigured
+        }
+
+        let session: Session
+        do {
+            session = try await client.auth.session
+        } catch {
+            throw ServiceError.notAuthenticated
+        }
+
+        return try await performWithRetry { [urlSession] in
+            var urlRequest = URLRequest(url: configuration.url.appendingPathComponent("rest/v1/rpc/createMessage"))
+            urlRequest.httpMethod = "POST"
+            urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+            urlRequest.setValue("return=representation", forHTTPHeaderField: "Prefer")
+            urlRequest.setValue(configuration.anonKey, forHTTPHeaderField: "apikey")
+            urlRequest.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+            urlRequest.httpBody = try SupabaseService.makeEncoder().encode(request)
+
+            let (data, response) = try await urlSession.data(for: urlRequest)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw ServiceError.requestFailed("Supabase returned an invalid response.")
+            }
+
+            guard (200 ..< 300).contains(httpResponse.statusCode) else {
+                let body = String(data: data, encoding: .utf8) ?? ""
+                throw ServiceError.requestFailed("createMessage failed with status \(httpResponse.statusCode): \(body)")
+            }
+
+            if data.isEmpty {
+                return MessageResponse(id: nil, status: "submitted", createdAt: Date())
+            }
+
+            let decoder = SupabaseService.makeDecoder()
+            if let response = try? decoder.decode(MessageResponse.self, from: data) {
+                return response
+            }
+            if let responses = try? decoder.decode([MessageResponse].self, from: data), let first = responses.first {
+                return first
+            }
+
+            throw ServiceError.requestFailed("Unexpected payload received from createMessage.")
+        }
+    }
+
     private func prepareClientIfNeeded() async {
         guard client == nil else { return }
         guard let config = await MainActor.run(body: { SupabaseConfig.loadDefault() }) else {
             return
         }
         client = SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
+        configuration = config
     }
 
     private static func makeDecoder() -> JSONDecoder {
@@ -206,6 +258,64 @@ actor SupabaseService {
 }
 
 // MARK: - Supabase DTOs
+
+extension SupabaseService {
+    struct MessageRequest: Encodable {
+        struct Highlight: Encodable {
+            let label: String
+            let value: String
+        }
+
+        let authorId: UUID
+        let practitionerName: String
+        let practitionerRole: String
+        let patientNhsNumber: String
+        let requestId: String?
+        let requestType: String?
+        let reason: String?
+        let locationCategory: String
+        let locationDescription: String?
+        let additionalNotes: String?
+        let rawPayload: String
+        let highlights: [Highlight]
+    }
+
+    struct MessageResponse: Decodable {
+        let id: UUID?
+        let status: String?
+        let createdAt: Date?
+
+        private enum CodingKeys: String, CodingKey {
+            case id
+            case status
+            case createdAt = "created_at"
+            case messageId = "message_id"
+        }
+
+        init(id: UUID?, status: String?, createdAt: Date?) {
+            self.id = id
+            self.status = status
+            self.createdAt = createdAt
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            if let directId = try container.decodeIfPresent(UUID.self, forKey: .id) {
+                id = directId
+            } else if let messageId = try container.decodeIfPresent(UUID.self, forKey: .messageId) {
+                id = messageId
+            } else if let idString = try container.decodeIfPresent(String.self, forKey: .id), let parsed = UUID(uuidString: idString) {
+                id = parsed
+            } else if let idString = try container.decodeIfPresent(String.self, forKey: .messageId), let parsed = UUID(uuidString: idString) {
+                id = parsed
+            } else {
+                id = nil
+            }
+            status = try container.decodeIfPresent(String.self, forKey: .status)
+            createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        }
+    }
+}
 
 private struct SupabaseHealthRecord: Decodable {
     let id: UUID
