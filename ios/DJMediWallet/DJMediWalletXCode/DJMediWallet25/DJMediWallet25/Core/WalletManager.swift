@@ -153,6 +153,53 @@ public class WalletManager: ObservableObject {
             completion(result)
         }
     }
+
+    // MARK: - Metadata
+    
+    public func storeMetadata<T: Codable>(_ value: T, forKey key: String, completion: @escaping (Result<Void, WalletError>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try self.storage.storeMetadata(value, forKey: key)
+                DispatchQueue.main.async {
+                    completion(.success(()))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(.storageFailed(error)))
+                }
+            }
+        }
+    }
+    
+    public func loadMetadata<T: Codable>(_ type: T.Type, forKey key: String, completion: @escaping (Result<T?, WalletError>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let value = try self.storage.loadMetadata(type, forKey: key)
+                DispatchQueue.main.async {
+                    completion(.success(value))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(.retrievalFailed(error)))
+                }
+            }
+        }
+    }
+    
+    public func deleteMetadata(forKey key: String, completion: @escaping (Result<Void, WalletError>) -> Void) {
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try self.storage.deleteMetadata(forKey: key)
+                DispatchQueue.main.async {
+                    completion(.success(()))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(.deletionFailed(error)))
+                }
+            }
+        }
+    }
     
     // MARK: - Credential Presentation
     

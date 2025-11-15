@@ -9,6 +9,7 @@ import SwiftUI
 
 struct RecordsListView: View {
     @EnvironmentObject var walletManager: WalletManager
+    @EnvironmentObject private var lockManager: AppLockManager
     @State private var records: [RecordItem] = []
     @State private var isLoading = false
     @State private var hasLoadedOnce = false
@@ -36,9 +37,11 @@ struct RecordsListView: View {
                 .task {
                     guard !hasLoadedOnce else { return }
                     hasLoadedOnce = true
+                    _ = await lockManager.loadUserProfile()
                     await refreshRecords()
                 }
                 .refreshable {
+                    await lockManager.loadUserProfile()
                     await refreshRecords()
                 }
                 .sheet(isPresented: $isPresentingAddRecord) {
@@ -60,6 +63,12 @@ struct RecordsListView: View {
 
     private var listContent: some View {
         List {
+            if let profile = lockManager.userProfile {
+                Section {
+                    ProfileGreetingView(profile: profile)
+                        .listRowSeparator(.hidden)
+                }
+            }
             if isLoading && records.isEmpty {
                 Section {
                     HStack {
@@ -157,6 +166,53 @@ struct RecordsListView: View {
     private func deleteRecord(_ record: RecordItem) {
         guard let index = records.firstIndex(where: { $0.id == record.id }) else { return }
         deleteRecords(at: IndexSet(integer: index))
+    }
+}
+
+private struct ProfileGreetingView: View {
+    let profile: AppLockManager.UserProfile
+    
+    private static let dateFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Hello, \(profile.firstName)")
+                .font(.title2)
+                .fontWeight(.semibold)
+            HStack(spacing: 8) {
+                Image(systemName: iconName(for: profile.role))
+                    .foregroundColor(.white)
+                Text(profile.role.displayName)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 10)
+            .background(profile.role == .patient ? Color.blue : Color.green)
+            .foregroundColor(.white)
+            .clipShape(Capsule())
+            Text("Consent captured \(relativeConsentDate)")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+        }
+        .padding(.vertical, 12)
+    }
+    
+    private var relativeConsentDate: String {
+        Self.dateFormatter.localizedString(for: profile.consentTimestamp, relativeTo: Date())
+    }
+    
+    private func iconName(for role: AppLockManager.UserProfile.Role) -> String {
+        switch role {
+        case .patient:
+            return "person.fill"
+        case .practitioner:
+            return "stethoscope"
+        }
     }
 }
 

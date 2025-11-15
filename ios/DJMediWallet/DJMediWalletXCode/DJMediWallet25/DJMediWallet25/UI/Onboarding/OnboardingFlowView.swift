@@ -85,20 +85,14 @@ struct OnboardingFlowView: View {
         }
         .background(Color(.systemBackground))
         .onAppear {
-            if let storedProfile = lockManager.userProfile {
-                firstName = storedProfile.firstName
-                lastName = storedProfile.lastName
-                selectedRole = storedProfile.role
-                hasStoredProfile = true
-            } else {
-                firstName = ""
-                lastName = ""
-                selectedRole = .patient
-                hasStoredProfile = false
-            }
+            applyProfileFromManager()
             generatePassphraseIfNeeded(force: false)
             didConfirmPassphrase = false
             profileError = nil
+        }
+        .task {
+            _ = await lockManager.loadUserProfile()
+            applyProfileFromManager()
         }
     }
     
@@ -118,19 +112,37 @@ struct OnboardingFlowView: View {
         }
     }
 
+    private func applyProfileFromManager() {
+        if let storedProfile = lockManager.userProfile {
+            firstName = storedProfile.firstName
+            lastName = storedProfile.lastName
+            selectedRole = storedProfile.role
+            hasStoredProfile = true
+        } else {
+            firstName = ""
+            lastName = ""
+            selectedRole = .patient
+            hasStoredProfile = false
+        }
+    }
+
     private func saveProfileAndAdvance() {
         profileError = nil
-        let profile = AppLockManager.UserProfile(firstName: firstName, lastName: lastName, role: selectedRole)
-        do {
-            try lockManager.registerUserProfile(profile)
-            hasStoredProfile = true
-            advance()
-        } catch AppLockManager.SetupError.profileIncomplete {
-            profileError = "Please enter your first and last name."
-        } catch AppLockManager.SetupError.storageFailure(let message) {
-            profileError = message
-        } catch {
-            profileError = "Unable to store profile."
+        let consentDate = Date()
+        let profile = AppLockManager.UserProfile(firstName: firstName, lastName: lastName, role: selectedRole, consentTimestamp: consentDate)
+        Task {
+            do {
+                _ = try await lockManager.registerUserProfile(profile)
+                hasStoredProfile = true
+                applyProfileFromManager()
+                advance()
+            } catch AppLockManager.SetupError.profileIncomplete {
+                profileError = "Please enter your first and last name."
+            } catch AppLockManager.SetupError.storageFailure(let message) {
+                profileError = message
+            } catch {
+                profileError = "Unable to store profile."
+            }
         }
     }
     

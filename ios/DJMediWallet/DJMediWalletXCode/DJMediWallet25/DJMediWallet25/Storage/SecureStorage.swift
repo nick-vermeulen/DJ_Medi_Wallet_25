@@ -215,6 +215,44 @@ public class SecureStorage {
             .filter { $0.pathExtension == "enc" }
             .map { $0.deletingPathExtension().lastPathComponent }
     }
+
+    // MARK: - Metadata
+
+    public func storeMetadata<T: Codable>(_ value: T, forKey key: String) throws {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let data = try encoder.encode(value)
+        let encrypted = try encrypt(data)
+        let url = try metadataURL(for: key)
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try encrypted.write(to: url, options: .atomic)
+    }
+    
+    public func loadMetadata<T: Codable>(_ type: T.Type, forKey key: String) throws -> T? {
+        let url = try metadataURL(for: key)
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let encrypted = try Data(contentsOf: url)
+        let data = try decrypt(encrypted)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(type, from: data)
+    }
+    
+    public func deleteMetadata(forKey key: String) throws {
+        let url = try metadataURL(for: key)
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+    }
+    
+    private func metadataURL(for key: String) throws -> URL {
+        let paths = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+        guard let baseDir = paths.first else {
+            throw StorageError.directoryNotFound
+        }
+        let metadataDir = baseDir.appendingPathComponent("Metadata")
+        return metadataDir.appendingPathComponent("\(key).meta")
+    }
 }
 
 // MARK: - Storage Error Types

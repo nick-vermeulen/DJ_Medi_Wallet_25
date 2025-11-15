@@ -32,6 +32,7 @@ final class AppLockManager: ObservableObject {
         var firstName: String
         var lastName: String
         var role: Role
+        var consentTimestamp: Date
         
         var normalizedFirstName: String {
             firstName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -40,6 +41,41 @@ final class AppLockManager: ObservableObject {
         var normalizedLastName: String {
             lastName.trimmingCharacters(in: .whitespacesAndNewlines)
         }
+        
+        init(firstName: String, lastName: String, role: Role, consentTimestamp: Date = Date()) {
+            self.firstName = firstName
+            self.lastName = lastName
+            self.role = role
+            self.consentTimestamp = consentTimestamp
+        }
+        
+        private enum CodingKeys: String, CodingKey {
+            case firstName
+            case lastName
+            case role
+            case consentTimestamp
+        }
+        
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            firstName = try container.decode(String.self, forKey: .firstName)
+            lastName = try container.decode(String.self, forKey: .lastName)
+            role = try container.decode(Role.self, forKey: .role)
+            consentTimestamp = try container.decodeIfPresent(Date.self, forKey: .consentTimestamp) ?? Date()
+        }
+        
+        func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(firstName, forKey: .firstName)
+            try container.encode(lastName, forKey: .lastName)
+            try container.encode(role, forKey: .role)
+            try container.encode(consentTimestamp, forKey: .consentTimestamp)
+        }
+    }
+    
+    private enum ProfileStorageKey {
+        static let metadata = "user_profile"
+        static let legacyDefaults = "com.djmediwallet.user.profile"
     }
     
     enum LockState: Equatable {
@@ -69,7 +105,6 @@ final class AppLockManager: ObservableObject {
     private let passcodeKey = "com.djmediwallet.passcode.hash"
     private let passphraseKey = "com.djmediwallet.passphrase.hash"
     private let lockTimeoutKey = "com.djmediwallet.lock.timeout"
-    private let profileKey = "com.djmediwallet.user.profile"
 
     private var lockWorkItem: DispatchWorkItem?
     
@@ -81,12 +116,7 @@ final class AppLockManager: ObservableObject {
         self.walletManager = walletManager ?? WalletManager.shared
         self.keychain = keychain
         self.defaults = defaults
-        if let profileData = defaults.data(forKey: profileKey),
-           let decodedProfile = try? JSONDecoder().decode(UserProfile.self, from: profileData) {
-            self.userProfile = decodedProfile
-        } else {
-            self.userProfile = nil
-        }
+        self.userProfile = AppLockManager.decodeLegacyProfile(from: defaults)
         if defaults.bool(forKey: onboardingKey) {
             self.lockState = .locked
         } else {
@@ -97,6 +127,10 @@ final class AppLockManager: ObservableObject {
         } else {
             self.lockTimeout = 60
             defaults.set(60, forKey: lockTimeoutKey)
+        }
+        Task { [weak self] in
+            guard let self else { return }
+            _ = await self.loadUserProfile()
         }
     }
     
@@ -280,24 +314,51 @@ final class AppLockManager: ObservableObject {
         return passphrase
     }
 
-    func registerUserProfile(_ profile: UserProfile) throws {
+    func registerUserProfile(_ profile: UserProfile) async throws -> UserProfile {
         let trimmedFirst = profile.normalizedFirstName
         let trimmedLast = profile.normalizedLastName
         guard !trimmedFirst.isEmpty, !trimmedLast.isEmpty else {
             throw SetupError.profileIncomplete
         }
-        let cleanedProfile = UserProfile(firstName: trimmedFirst, lastName: trimmedLast, role: profile.role)
+        let consentDate = profile.consentTimestamp
+        let cleanedProfile = UserProfile(firstName: trimmedFirst, lastName: trimmedLast, role: profile.role, consentTimestamp: consentDate)
         do {
-            let data = try JSONEncoder().encode(cleanedProfile)
-            defaults.set(data, forKey: profileKey)
+            try await storeProfileMetadata(cleanedProfile)
+            persistProfileToDefaults(cleanedProfile)
             userProfile = cleanedProfile
+            return cleanedProfile
+        } catch let error as WalletError {
+            throw SetupError.storageFailure(error.localizedDescription)
         } catch {
             throw SetupError.storageFailure("Unable to store profile securely")
         }
     }
     
-    func clearUserProfile() {
-        defaults.removeObject(forKey: profileKey)
+    @discardableResult
+    func loadUserProfile() async -> UserProfile? {
+        do {
+            if let profile = try await loadProfileMetadata() {
+                persistProfileToDefaults(profile)
+                userProfile = profile
+                return profile
+            }
+        } catch {
+            // Fallback to defaults-only profile when metadata is unavailable
+        }
+        if let legacy = AppLockManager.decodeLegacyProfile(from: defaults) {
+            userProfile = legacy
+            return legacy
+        }
+        return nil
+    }
+    
+    func clearUserProfile() async {
+        await withCheckedContinuation { continuation in
+            walletManager.deleteMetadata(forKey: ProfileStorageKey.metadata) { _ in
+                continuation.resume()
+            }
+        }
+        defaults.removeObject(forKey: ProfileStorageKey.legacyDefaults)
         userProfile = nil
     }
     
@@ -319,5 +380,48 @@ final class AppLockManager: ObservableObject {
         let trimmed = passcode.trimmingCharacters(in: .whitespacesAndNewlines)
         let digest = SHA256.hash(data: Data(trimmed.utf8))
         return Data(digest)
+    }
+
+    private func storeProfileMetadata(_ profile: UserProfile) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            walletManager.storeMetadata(profile, forKey: ProfileStorageKey.metadata) { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: ())
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    private func loadProfileMetadata() async throws -> UserProfile? {
+        try await withCheckedThrowingContinuation { continuation in
+            walletManager.loadMetadata(UserProfile.self, forKey: ProfileStorageKey.metadata) { result in
+                switch result {
+                case .success(let profile):
+                    continuation.resume(returning: profile)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+    
+    private func persistProfileToDefaults(_ profile: UserProfile) {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        if let data = try? encoder.encode(profile) {
+            defaults.set(data, forKey: ProfileStorageKey.legacyDefaults)
+        }
+    }
+    
+    private static func decodeLegacyProfile(from defaults: UserDefaults) -> UserProfile? {
+        guard let data = defaults.data(forKey: ProfileStorageKey.legacyDefaults) else {
+            return nil
+        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try? decoder.decode(UserProfile.self, from: data)
     }
 }
