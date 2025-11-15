@@ -15,14 +15,14 @@ struct SettingsView: View {
     @State private var passphraseError: String?
     @State private var firstName = ""
     @State private var lastName = ""
-    @State private var selectedRole: AppLockManager.UserProfile.Role = .patient
     @State private var storedProfile: AppLockManager.UserProfile?
     @State private var isLoadingProfile = true
     @State private var isSavingProfile = false
     @State private var profileErrorMessage: String?
-    @State private var roleConfirmationPending = false
-    @State private var pendingRole: AppLockManager.UserProfile.Role?
-    @State private var previousRoleBeforeConfirmation: AppLockManager.UserProfile.Role?
+    @State private var optimisticRole: AppLockManager.UserProfile.Role?
+    @State private var isSwitchingRole = false
+    @State private var roleSwitchError: IdentifiableError?
+    @FocusState private var focusedField: Field?
 
     private let lockOptions: [LockTimeoutOption] = LockTimeoutOption.all
 
@@ -40,25 +40,7 @@ struct SettingsView: View {
             .disabled(isSavingProfile)
             .task { await ensureProfileLoaded() }
             .toolbar { saveToolbar }
-            .confirmationDialog(
-                "Confirm Role Change",
-                isPresented: $roleConfirmationPending,
-                presenting: pendingRole
-            ) { role in
-                Button("Switch to \(role.displayName)", role: .destructive) {
-                    pendingRole = nil
-                    previousRoleBeforeConfirmation = nil
-                }
-                Button("Cancel", role: .cancel) {
-                    if let previousRoleBeforeConfirmation {
-                        selectedRole = previousRoleBeforeConfirmation
-                    }
-                    pendingRole = nil
-                    previousRoleBeforeConfirmation = nil
-                }
-            } message: { role in
-                Text("Switching to the \(role.displayName) experience changes how data is presented. Confirm to proceed.")
-            }
+            .toolbar { keyboardToolbar }
             .sheet(isPresented: $isResettingPassphrase) {
                 PassphraseResetSheet(
                     passphrase: presentedPassphrase,
@@ -68,6 +50,25 @@ struct SettingsView: View {
                     onCancel: handlePassphraseResetCancellation
                 )
             }
+            .overlay {
+                if isSwitchingRole {
+                    ProgressView("Updating role…")
+                        .progressViewStyle(.circular)
+                        .padding()
+                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                }
+            }
+            .alert(
+                "Role Update Failed",
+                isPresented: Binding(
+                    get: { roleSwitchError != nil },
+                    set: { _ in roleSwitchError = nil }
+                )
+            ) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(roleSwitchError?.message ?? "An unexpected error occurred.")
+            }
         }
     }
 
@@ -75,7 +76,7 @@ struct SettingsView: View {
 
     private var profileSection: some View {
         Section(header: Text("Profile"), footer: profileFooter) {
-            if isLoadingProfile && storedProfile == nil {
+            if isLoadingProfile && lockManager.userProfile == nil && storedProfile == nil {
                 ProgressView("Loading profile...")
                     .frame(maxWidth: .infinity, alignment: .center)
             } else {
@@ -83,16 +84,30 @@ struct SettingsView: View {
                     .textContentType(.givenName)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled(false)
+                    .focused($focusedField, equals: .firstName)
+                    .submitLabel(.done)
                 TextField("Last Name", text: $lastName)
                     .textContentType(.familyName)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled(false)
-                Picker("Role", selection: roleSelectionBinding) {
-                    ForEach(AppLockManager.UserProfile.Role.allCases) { role in
-                        Text(role.displayName).tag(role)
-                    }
+                    .focused($focusedField, equals: .lastName)
+                    .submitLabel(.done)
+
+                Toggle("Practitioner Mode", isOn: practitionerToggleBinding)
+                    .disabled(lockManager.userProfile == nil || isSwitchingRole)
+                    .accessibilityHint(lockManager.userProfile == nil
+                        ? "A stored profile is required before switching roles."
+                        : "Switch between patient and practitioner features.")
+
+                if let currentRole = optimisticRole ?? lockManager.userProfile?.role ?? storedProfile?.role {
+                    Text("Current role: \(currentRole.displayName)")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                        .padding(.top, 2)
+                } else {
+                    Text("No profile is currently stored.")
+                        .foregroundStyle(.secondary)
                 }
-                .pickerStyle(.segmented)
             }
         }
     }
@@ -150,6 +165,8 @@ struct SettingsView: View {
             VStack(alignment: .center, spacing: 4) {
                 Text("Made with Care in the Channel Islands")
                     .font(.footnote)
+                Text("Using SwiftUI. Well it is the new Smalltalk!")
+                    .font(.footnote)
                 Text("© Lazy-Jack.com")
                     .font(.footnote)
                 Text("\"So long and thanks for all the fish...\"")
@@ -198,24 +215,32 @@ struct SettingsView: View {
         )
     }
 
-    private var roleSelectionBinding: Binding<AppLockManager.UserProfile.Role> {
+    private var practitionerToggleBinding: Binding<Bool> {
         Binding(
-            get: { selectedRole },
-            set: { newRole in
-                guard newRole != selectedRole else { return }
-                if storedProfile == nil {
-                    selectedRole = newRole
-                } else {
-                    previousRoleBeforeConfirmation = selectedRole
-                    selectedRole = newRole
-                    pendingRole = newRole
-                    roleConfirmationPending = true
+            get: {
+                let role = optimisticRole ?? lockManager.userProfile?.role ?? storedProfile?.role
+                return role == .practitioner
+            },
+            set: { newValue in
+                guard isSwitchingRole == false else { return }
+                guard let currentRole = lockManager.userProfile?.role ?? storedProfile?.role else {
+                    optimisticRole = nil
+                    return
                 }
+                let target: AppLockManager.UserProfile.Role = newValue ? .practitioner : .patient
+                guard target != currentRole else { return }
+                optimisticRole = target
+                performRoleSwitch(to: target)
             }
         )
     }
 
     // MARK: - Derived State
+
+    private enum Field: Hashable {
+        case firstName
+        case lastName
+    }
 
     private var trimmedFirstName: String {
         firstName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -233,7 +258,6 @@ struct SettingsView: View {
         guard let storedProfile else { return isProfileValid }
         return storedProfile.firstName != trimmedFirstName
             || storedProfile.lastName != trimmedLastName
-            || storedProfile.role != selectedRole
     }
 
     // MARK: - Actions
@@ -249,10 +273,6 @@ struct SettingsView: View {
             profileErrorMessage = "Please enter both your first and last name."
             return
         }
-        guard !roleConfirmationPending else {
-            profileErrorMessage = "Confirm your role selection to continue."
-            return
-        }
         Task { await persistProfile() }
     }
 
@@ -262,10 +282,11 @@ struct SettingsView: View {
             profileErrorMessage = nil
         }
         let consentDate = storedProfile?.consentTimestamp ?? Date()
+        let role = storedProfile?.role ?? lockManager.userProfile?.role ?? .patient
         let profile = AppLockManager.UserProfile(
             firstName: trimmedFirstName,
             lastName: trimmedLastName,
-            role: selectedRole,
+            role: role,
             consentTimestamp: consentDate
         )
         do {
@@ -274,7 +295,7 @@ struct SettingsView: View {
                 storedProfile = updatedProfile
                 firstName = updatedProfile.firstName
                 lastName = updatedProfile.lastName
-                selectedRole = updatedProfile.role
+                optimisticRole = nil
                 isSavingProfile = false
             }
         } catch AppLockManager.SetupError.profileIncomplete {
@@ -302,11 +323,8 @@ struct SettingsView: View {
             if let profile = loadedProfile {
                 firstName = profile.firstName
                 lastName = profile.lastName
-                selectedRole = profile.role
             }
-            previousRoleBeforeConfirmation = nil
-            pendingRole = nil
-            roleConfirmationPending = false
+            optimisticRole = nil
             isLoadingProfile = false
         }
     }
@@ -339,6 +357,15 @@ struct SettingsView: View {
 
     // MARK: - Helpers
 
+    private var keyboardToolbar: some ToolbarContent {
+        ToolbarItemGroup(placement: .keyboard) {
+            Spacer()
+            Button("Done") {
+                focusedField = nil
+            }
+        }
+    }
+
     private func consentDescription(for profile: AppLockManager.UserProfile) -> String? {
         Self.consentFormatter.localizedString(for: profile.consentTimestamp, relativeTo: Date())
     }
@@ -348,6 +375,45 @@ struct SettingsView: View {
         formatter.unitsStyle = .full
         return formatter
     }()
+
+    private func performRoleSwitch(to target: AppLockManager.UserProfile.Role) {
+        guard isSwitchingRole == false else { return }
+        guard let profile = lockManager.userProfile else {
+            optimisticRole = nil
+            return
+        }
+        guard profile.role != target else {
+            optimisticRole = nil
+            return
+        }
+
+        isSwitchingRole = true
+        roleSwitchError = nil
+
+        Task { @MainActor in
+            defer { isSwitchingRole = false }
+
+            var updated = profile
+            updated.role = target
+
+            do {
+                _ = try await lockManager.registerUserProfile(updated)
+                let refreshed = await lockManager.loadUserProfile() ?? updated
+                storedProfile = refreshed
+                firstName = refreshed.firstName
+                lastName = refreshed.lastName
+                optimisticRole = nil
+            } catch {
+                roleSwitchError = IdentifiableError(message: error.localizedDescription)
+                optimisticRole = profile.role
+            }
+        }
+    }
+}
+
+private struct IdentifiableError: Identifiable {
+    let id = UUID()
+    let message: String
 }
 
 private struct LockTimeoutOption: Identifiable {
