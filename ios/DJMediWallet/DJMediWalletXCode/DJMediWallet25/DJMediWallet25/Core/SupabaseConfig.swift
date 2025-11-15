@@ -16,8 +16,8 @@ struct SupabaseConfig {
     /// - Parameter bundle: The bundle to read configuration values from. Defaults to `.main`.
     /// - Returns: A configured `SupabaseConfig` instance if both URL and anon key are present and valid.
     static func load(from bundle: Bundle) -> SupabaseConfig? {
-        guard let urlString = bundle.object(forInfoDictionaryKey: "SupabaseURL") as? String,
-              let anonKey = bundle.object(forInfoDictionaryKey: "SupabaseAnonKey") as? String,
+        guard let urlString = bundle.object(forInfoDictionaryKey: "postgresql://postgres.mpaxzasbhhfigidorgle:Hackathon2025@aws-1-eu-west-1.pooler.supabase.com:5432/postgres") as? String,
+              let anonKey = bundle.object(forInfoDictionaryKey: "JEbwLuq30jtct/3yta2yKN4n9bAxOAC3vzQ8PKLI/feNN93syWLw8u/Nrg7XB83dQylNIZr4kpIATXK0vIMnYg==") as? String,
               let trimmedURL = urlString.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
               let trimmedKey = anonKey.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty,
               let resolvedURL = URL(string: trimmedURL) else {

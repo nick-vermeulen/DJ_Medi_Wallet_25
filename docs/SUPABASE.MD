@@ -124,21 +124,38 @@ Expand the app with role-specific views using SwiftUI.
 - **Encryption**: Use Supabase's built-in pg_crypto for sensitive fields; E2EE for chats (implement client-side with CryptoKit).
 - **Auditing**: Enable Supabase logs; add triggers for change history.
 - **HIPAA Notes**: Use Supabase's HIPAA plan (BAA available). Avoid storing PHI in realtime payloads—use IDs only.
-- **Error Handling**: Implement retries for network, token refresh:
+- **Error Handling**: Implement retries for network operations and monitor auth state with the async sequence API:
   ```swift
-  supabase.auth.onAuthStateChange { event, session in /* Handle refresh */ }
+  Task {
+    for await (event, session) in supabase.auth.stateChanges {
+      switch event {
+      case .initialSession, .accessTokenRefreshed:
+        guard let session = session else { return }
+        // Update cached credentials via SupabaseService.shared
+        await AppLockManager.shared.handle(session: session)
+      case .signedOut:
+        await AppLockManager.shared.handleSignOut()
+      default:
+        break
+      }
+    }
+  }
   ```
 
 #### 6. Testing and Deployment (1-2 weeks)
+
 - **Unit/UI Tests**: Use XCTest for auth flows, data fetching. Mock Supabase with a local instance.
-- **Beta Testing**: Use TestFlight; test with dummy FHIR data.
-- **Deployment**: Build for App Store; configure Supabase webhooks for prod alerts.
-- **Monitoring**: Use Supabase analytics; integrate Sentry for errors.
+- **Beta Testing**: Use TestFlight; validate with synthetic FHIR payloads before capturing real PHI.
+- **Deployment**: Build for App Store; configure Supabase webhooks for production alerts.
+- **Monitoring**: Use Supabase analytics; integrate Sentry (or similar) for runtime errors.
+
 
 #### Potential Challenges and Mitigations
+
 - **Performance**: Large FHIR JSONB—paginate queries (Supabase supports limits/offsets).
 - **Cross-Platform**: If expanding beyond iOS, use Supabase's JS client for web.
 - **Cost**: Free tier for dev; scale to paid for realtime usage.
 - **Learning Curve**: Follow Supabase iOS quickstarts and YouTube tutorials for hands-on.
+
 
 This plan keeps the app modular—start with auth and DB integration, then add features iteratively. If you need code templates, wireframes, or adjustments (e.g., self-hosted Supabase), let me know!
