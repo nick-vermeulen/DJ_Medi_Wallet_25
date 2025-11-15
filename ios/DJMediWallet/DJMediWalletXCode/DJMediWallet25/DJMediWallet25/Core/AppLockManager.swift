@@ -35,6 +35,7 @@ final class AppLockManager: ObservableObject {
     private let onboardingKey = "com.djmediwallet.onboarding.completed"
     private let biometricsKey = "com.djmediwallet.biometrics.enabled"
     private let passcodeKey = "com.djmediwallet.passcode.hash"
+    private let passphraseKey = "com.djmediwallet.passphrase.hash"
     private let lockTimeoutKey = "com.djmediwallet.lock.timeout"
 
     private var lockWorkItem: DispatchWorkItem?
@@ -47,17 +48,16 @@ final class AppLockManager: ObservableObject {
         self.walletManager = walletManager ?? WalletManager.shared
         self.keychain = keychain
         self.defaults = defaults
-        if let storedTimeout = defaults.object(forKey: lockTimeoutKey) as? Double {
-            self.lockTimeout = storedTimeout
-        } else {
-            self.lockTimeout = 60
-            defaults.set(lockTimeout, forKey: lockTimeoutKey)
-        }
-        
         if defaults.bool(forKey: onboardingKey) {
             self.lockState = .locked
         } else {
             self.lockState = .onboarding
+        }
+        if let storedTimeout = defaults.object(forKey: lockTimeoutKey) as? Double {
+            self.lockTimeout = storedTimeout
+        } else {
+            self.lockTimeout = 60
+            defaults.set(60, forKey: lockTimeoutKey)
         }
     }
     
@@ -71,6 +71,10 @@ final class AppLockManager: ObservableObject {
     
     var hasStoredPasscode: Bool {
         keychain.contains(passcodeKey)
+    }
+
+    var hasStoredPassphrase: Bool {
+        keychain.contains(passphraseKey)
     }
     
     func canUseBiometrics() -> Bool {
@@ -105,6 +109,7 @@ final class AppLockManager: ObservableObject {
         } catch {
             defaults.set(false, forKey: onboardingKey)
             try? keychain.delete(passcodeKey)
+            try? keychain.delete(passphraseKey)
             throw SetupError.walletInitializationFailure(error.localizedDescription)
         }
         
@@ -188,6 +193,49 @@ final class AppLockManager: ObservableObject {
     func cancelAutoLock() {
         lockWorkItem?.cancel()
         lockWorkItem = nil
+    }
+
+    func generateRecoveryPassphrase() throws -> [String] {
+        try PassphraseManager.shared.generatePassphrase()
+    }
+
+    func storeRecoveryPassphrase(words: [String]) throws {
+        let normalized = PassphraseManager.shared.normalize(words)
+        let hash = hash(normalized)
+        try keychain.save(hash, for: passphraseKey)
+    }
+
+    func unlock(withPassphraseInput input: String) {
+        let words = input
+            .split(whereSeparator: { $0.isWhitespace || $0.isNewline })
+            .map { String($0).lowercased() }
+        guard words.count == 12 else {
+            lastErrorMessage = "Passphrase must contain 12 words."
+            return
+        }
+        do {
+            guard let stored = try keychain.read(passphraseKey) else {
+                lastErrorMessage = "No recovery passphrase set."
+                return
+            }
+            let normalized = PassphraseManager.shared.normalize(words)
+            let hash = hash(normalized)
+            if stored == hash {
+                lastErrorMessage = nil
+                lockState = .unlocked
+                cancelAutoLock()
+            } else {
+                lastErrorMessage = "Incorrect passphrase."
+            }
+        } catch {
+            lastErrorMessage = "Unable to verify passphrase."
+        }
+    }
+
+    func resetRecoveryPassphrase() throws -> [String] {
+        let passphrase = try generateRecoveryPassphrase()
+        try storeRecoveryPassphrase(words: passphrase)
+        return passphrase
     }
     
     private func initializeWalletIfNeeded() async throws {

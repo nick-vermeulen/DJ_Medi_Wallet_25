@@ -13,6 +13,8 @@ struct UnlockView: View {
     @State private var passcode = ""
     @FocusState private var isPasscodeFieldFocused: Bool
     @State private var attemptedBiometricUnlock = false
+    @State private var isPassphraseSheetPresented = false
+    @State private var passphraseInput = ""
     
     var body: some View {
         VStack(spacing: 24) {
@@ -64,6 +66,13 @@ struct UnlockView: View {
                 }
                 .disabled(passcode.count != 6)
             }
+            if lockManager.hasStoredPassphrase {
+                Button(action: { isPassphraseSheetPresented = true }) {
+                    Text("Use Recovery Passphrase")
+                        .font(.callout)
+                        .underline()
+                }
+            }
             Spacer()
         }
         .onAppear {
@@ -72,6 +81,22 @@ struct UnlockView: View {
         }
         .onChange(of: passcode) { newValue in
             passcode = String(newValue.filter { $0.isNumber }.prefix(6))
+        }
+        .sheet(isPresented: $isPassphraseSheetPresented) {
+            RecoveryPassphraseSheet(
+                input: $passphraseInput,
+                onCancel: {
+                    passphraseInput = ""
+                    isPassphraseSheetPresented = false
+                },
+                onSubmit: {
+                    lockManager.unlock(withPassphraseInput: passphraseInput)
+                    passphraseInput = ""
+                    if lockManager.lockState == .unlocked {
+                        isPassphraseSheetPresented = false
+                    }
+                }
+            )
         }
     }
     
@@ -113,5 +138,41 @@ struct UnlockView: View {
         default:
             return "lock"
         }
+    }
+}
+
+private struct RecoveryPassphraseSheet: View {
+    @Binding var input: String
+    let onCancel: () -> Void
+    let onSubmit: () -> Void
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(
+                    header: Text("Enter your 12-word recovery passphrase."),
+                    footer: Text("Words must be separated by spaces.")
+                ) {
+                    TextEditor(text: $input)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                        .frame(minHeight: 160)
+                }
+            }
+            .navigationTitle("Recovery Passphrase")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel", action: onCancel)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Unlock", action: onSubmit)
+                        .disabled(!isValidInput)
+                }
+            }
+        }
+    }
+    
+    private var isValidInput: Bool {
+        input.split(whereSeparator: { $0.isWhitespace || $0.isNewline }).count == 12
     }
 }
