@@ -26,10 +26,12 @@ enum RecordType: String, CaseIterable {
 
 struct AddRecordView: View {
     @EnvironmentObject var walletManager: WalletManager
+    @Environment(\.dismiss) private var dismiss
     @State private var selectedType: RecordType = .observation
     @State private var isSaving = false
     @State private var showAlert = false
     @State private var alertMessage = ""
+    @State private var didSaveSuccessfully = false
     
     var body: some View {
         NavigationView {
@@ -77,7 +79,12 @@ struct AddRecordView: View {
             }
             .navigationTitle("Add Medical Record")
             .alert("Save Status", isPresented: $showAlert) {
-                Button("OK", role: .cancel) { }
+                Button("OK", role: .cancel) {
+                    if didSaveSuccessfully {
+                        didSaveSuccessfully = false
+                        dismiss()
+                    }
+                }
             } message: {
                 Text(alertMessage)
             }
@@ -85,8 +92,6 @@ struct AddRecordView: View {
     }
     
     private func saveObservation(_ observation: Observation) {
-        isSaving = true
-        
         let credential = MedicalCredential(
             id: observation.id ?? UUID().uuidString,
             type: "Observation",
@@ -95,22 +100,10 @@ struct AddRecordView: View {
             fhirResource: FHIRResource(resourceType: "Observation", id: observation.id, data: observation.toDictionary())
         )
         
-        walletManager.addCredential(credential) { result in
-            isSaving = false
-            switch result {
-            case .success:
-                alertMessage = "Record saved successfully!"
-                showAlert = true
-            case .failure(let error):
-                alertMessage = "Failed to save: \(error.localizedDescription)"
-                showAlert = true
-            }
-        }
+        performSave(for: credential)
     }
     
     private func saveCondition(_ condition: Condition) {
-        isSaving = true
-        
         let credential = MedicalCredential(
             id: condition.id ?? UUID().uuidString,
             type: "Condition",
@@ -119,22 +112,10 @@ struct AddRecordView: View {
             fhirResource: FHIRResource(resourceType: "Condition", id: condition.id, data: condition.toDictionary())
         )
         
-        walletManager.addCredential(credential) { result in
-            isSaving = false
-            switch result {
-            case .success:
-                alertMessage = "Record saved successfully!"
-                showAlert = true
-            case .failure(let error):
-                alertMessage = "Failed to save: \(error.localizedDescription)"
-                showAlert = true
-            }
-        }
+        performSave(for: credential)
     }
     
     private func saveMedication(_ medication: MedicationStatement) {
-        isSaving = true
-        
         let credential = MedicalCredential(
             id: medication.id ?? UUID().uuidString,
             type: "MedicationStatement",
@@ -143,17 +124,29 @@ struct AddRecordView: View {
             fhirResource: FHIRResource(resourceType: "MedicationStatement", id: medication.id, data: medication.toDictionary())
         )
         
+        performSave(for: credential)
+    }
+
+    private func performSave(for credential: MedicalCredential) {
+        isSaving = true
         walletManager.addCredential(credential) { result in
-            isSaving = false
-            switch result {
-            case .success:
-                alertMessage = "Record saved successfully!"
-                showAlert = true
-            case .failure(let error):
-                alertMessage = "Failed to save: \(error.localizedDescription)"
-                showAlert = true
+            DispatchQueue.main.async {
+                isSaving = false
+                handleSaveResult(result)
             }
         }
+    }
+
+    private func handleSaveResult(_ result: Result<Void, Error>) {
+        switch result {
+        case .success:
+            alertMessage = "Record saved successfully!"
+            didSaveSuccessfully = true
+        case .failure(let error):
+            alertMessage = "Failed to save: \(error.localizedDescription)"
+            didSaveSuccessfully = false
+        }
+        showAlert = true
     }
 }
 

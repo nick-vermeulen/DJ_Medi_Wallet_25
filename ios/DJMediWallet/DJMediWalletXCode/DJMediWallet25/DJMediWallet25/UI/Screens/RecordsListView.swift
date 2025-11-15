@@ -102,9 +102,9 @@ struct RecordRow: View {
             
             Spacer()
             
-            Image(systemName: "chevron.right")
+        /*    Image(systemName: "chevron.right")
                 .foregroundColor(.secondary)
-                .font(.caption)
+                .font(.caption) -   NJV Removed as the Navigation Link > is included by default when you use Navigation Link */
         }
         .padding(.vertical, 4)
     }
