@@ -35,7 +35,7 @@ actor SupabaseService {
     private let decoder: JSONDecoder
 
     private init() {
-        if let config = SupabaseConfig.load() {
+        if let config = SupabaseConfig.loadDefault() {
             self.client = SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
         } else {
             self.client = nil
@@ -52,24 +52,25 @@ actor SupabaseService {
 
     func currentUserId() async throws -> UUID {
         let client = try requireClient()
-        if let session = client.auth.session, let uuid = UUID(uuidString: session.user.id) {
-            return uuid
+        do {
+            let session = try await client.auth.session
+            return session.user.id
+        } catch {
+            throw ServiceError.notAuthenticated
         }
-        throw ServiceError.invalidUserIdentifier
     }
 
     func fetchPatientRecords(for patientId: UUID) async throws -> [MedicalCredential] {
         let client = try requireClient()
         do {
-            let response = try await client.database
+            let response = try await client
                 .from("health_records")
                 .select()
                 .eq("patient_id", value: patientId.uuidString)
                 .order("updated_at", ascending: false)
                 .execute()
-            guard let data = response.data else {
-                return []
-            }
+            let data = response.data
+            guard data.isEmpty == false else { return [] }
             let payload = try decoder.decode([SupabaseHealthRecord].self, from: data)
             return payload.map { $0.toCredential() }
         } catch {
