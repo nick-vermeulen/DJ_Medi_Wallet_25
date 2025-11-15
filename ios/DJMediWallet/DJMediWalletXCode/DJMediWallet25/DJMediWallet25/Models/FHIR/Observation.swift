@@ -8,7 +8,7 @@
 import Foundation
 
 /// FHIR Observation resource for vital signs and lab results
-public struct Observation: Codable {
+public struct FHIRObservation: Codable {
     public let resourceType: String
     public let id: String?
     public let status: String
@@ -20,7 +20,7 @@ public struct Observation: Codable {
     public let valueQuantity: Quantity?
     public let valueString: String?
     public let valueBoolean: Bool?
-    public let component: [ObservationComponent]?
+    public let component: [FHIRObservationComponent]?
     public let interpretation: [CodeableConcept]?
     public let note: [Annotation]?
     
@@ -35,7 +35,7 @@ public struct Observation: Codable {
         valueQuantity: Quantity? = nil,
         valueString: String? = nil,
         valueBoolean: Bool? = nil,
-        component: [ObservationComponent]? = nil,
+        component: [FHIRObservationComponent]? = nil,
         interpretation: [CodeableConcept]? = nil,
         note: [Annotation]? = nil
     ) {
@@ -57,7 +57,7 @@ public struct Observation: Codable {
 }
 
 /// FHIR Observation Component (for multi-value observations)
-public struct ObservationComponent: Codable {
+public struct FHIRObservationComponent: Codable {
     public let code: CodeableConcept
     public let valueQuantity: Quantity?
     public let valueString: String?

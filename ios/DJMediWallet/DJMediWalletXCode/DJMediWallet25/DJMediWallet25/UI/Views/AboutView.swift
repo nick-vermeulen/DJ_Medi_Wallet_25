@@ -25,6 +25,13 @@ struct AboutView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
+                Image("AboutIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 140)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 24)
+                    .accessibilityHidden(true)
                 Text("About DJ Medi Wallet")
                     .font(.largeTitle)
                     .fontWeight(.bold)

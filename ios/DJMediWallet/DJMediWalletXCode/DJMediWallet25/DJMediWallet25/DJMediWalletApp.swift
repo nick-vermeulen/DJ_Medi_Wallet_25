@@ -7,20 +7,26 @@
 
 import SwiftUI
 import SwiftData
+import Combine
 
 @main
 @MainActor
 struct DJMediWalletApp25: App {
     @StateObject private var walletManager: WalletManager
     @StateObject private var lockManager: AppLockManager
+    @StateObject private var snomedService: SNOMEDService
+    private let snomedStore: SNOMEDStore
     private let modelContainer: ModelContainer
     
     init() {
         let sharedWallet = WalletManager.shared
+        let snomedStore = SNOMEDStore(persistenceURL: SNOMEDStore.defaultPersistenceURL())
         _walletManager = StateObject(wrappedValue: sharedWallet)
         _lockManager = StateObject(wrappedValue: AppLockManager(walletManager: sharedWallet))
+        self.snomedStore = snomedStore
+        _snomedService = StateObject(wrappedValue: SNOMEDService(store: snomedStore))
         do {
-            modelContainer = try ModelContainer(for: ReportTemplate.self, ExamPreset.self, SNOMEDConcept.self)
+            modelContainer = try ModelContainer(for: ReportTemplate.self, ExamPreset.self)
         } catch {
             fatalError("Failed to initialize model container: \(error.localizedDescription)")
         }
@@ -31,6 +37,7 @@ struct DJMediWalletApp25: App {
             AppRootView()
                 .environmentObject(walletManager)
                 .environmentObject(lockManager)
+                .environmentObject(snomedService)
                 .modelContainer(modelContainer)
         }
     }

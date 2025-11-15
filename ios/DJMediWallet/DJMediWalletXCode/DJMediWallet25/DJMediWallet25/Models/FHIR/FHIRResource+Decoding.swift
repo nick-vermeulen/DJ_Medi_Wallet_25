@@ -18,7 +18,7 @@ enum FHIRResourceDecodingError: LocalizedError {
 }
 
 extension FHIRResource {
-    func decodeObservation() throws -> Observation {
+    func decodeObservation() throws -> FHIRObservation {
         guard resourceType == "Observation" else {
             throw FHIRResourceDecodingError.unsupportedResourceType(expected: "Observation")
         }
@@ -34,7 +34,7 @@ extension FHIRResource {
         }
         let jsonData = try JSONSerialization.data(withJSONObject: payload, options: [])
         let decoder = JSONDecoder()
-        return try decoder.decode(Observation.self, from: jsonData)
+    return try decoder.decode(FHIRObservation.self, from: jsonData)
     }
 
     func makeObservationBundle(fallbackIdentifier: String) throws -> FHIRBundle {

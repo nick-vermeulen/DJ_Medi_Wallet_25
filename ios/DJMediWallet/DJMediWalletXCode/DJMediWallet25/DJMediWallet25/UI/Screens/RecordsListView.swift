@@ -322,22 +322,43 @@ struct RecordItem: Identifiable {
                     self.type = "Observation"
                     self.title = "Observation"
                 }
-                
-                // Extract value
+
+                let formatQuantity: ([String: Any]) -> String? = { quantity in
+                    let numericValue: Double?
+                    if let number = quantity["value"] as? NSNumber {
+                        numericValue = number.doubleValue
+                    } else {
+                        numericValue = quantity["value"] as? Double
+                    }
+                    guard let numericValue else { return nil }
+                    if let unit = quantity["unit"] as? String, unit.isEmpty == false {
+                        return "\(numericValue) \(unit)"
+                    }
+                    return "\(numericValue)"
+                }
+
                 if let valueQuantity = data["valueQuantity"] as? [String: Any],
-                   let value = valueQuantity["value"] as? Double,
-                   let unit = valueQuantity["unit"] as? String {
-                    self.description = "\(value) \(unit)"
+                   let formatted = formatQuantity(valueQuantity) {
+                    self.description = formatted
+                } else if let valueString = data["valueString"] as? String, valueString.isEmpty == false {
+                    self.description = valueString
+                } else if let valueBoolean = data["valueBoolean"] as? Bool {
+                    self.description = valueBoolean ? "Yes" : "No"
                 } else if let components = data["component"] as? [[String: Any]], !components.isEmpty {
                     let values = components.compactMap { component -> String? in
-                        guard let valueQty = component["valueQuantity"] as? [String: Any],
-                              let value = valueQty["value"] as? Double,
-                              let unit = valueQty["unit"] as? String else {
-                            return nil
+                        if let valueQty = component["valueQuantity"] as? [String: Any],
+                           let formatted = formatQuantity(valueQty) {
+                            return formatted
                         }
-                        return "\(value) \(unit)"
+                        if let valueString = component["valueString"] as? String, valueString.isEmpty == false {
+                            return valueString
+                        }
+                        if let valueBoolean = component["valueBoolean"] as? Bool {
+                            return valueBoolean ? "Yes" : "No"
+                        }
+                        return nil
                     }
-                    self.description = values.joined(separator: " / ")
+                    self.description = values.isEmpty ? "No value" : values.joined(separator: " / ")
                 } else {
                     self.description = "No value"
                 }

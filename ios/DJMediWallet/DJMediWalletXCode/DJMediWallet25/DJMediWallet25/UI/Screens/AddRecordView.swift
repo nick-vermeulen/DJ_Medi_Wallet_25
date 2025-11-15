@@ -97,7 +97,7 @@ struct AddRecordView: View {
         }
     }
     
-    private func saveObservation(_ observation: Observation) {
+    private func saveObservation(_ observation: FHIRObservation) {
         let credential = MedicalCredential(
             id: observation.id ?? UUID().uuidString,
             type: "Observation",
@@ -185,7 +185,7 @@ struct RecordTypeButton: View {
 }
 
 // Helper extensions for converting FHIR models to dictionaries
-extension Observation {
+extension FHIRObservation {
     func toDictionary() -> [String: Any] {
         var dict: [String: Any] = [
             "resourceType": resourceType,
@@ -198,7 +198,10 @@ extension Observation {
         if let subject = subject { dict["subject"] = subject.toDictionary() }
         if let effectiveDateTime = effectiveDateTime { dict["effectiveDateTime"] = effectiveDateTime }
         if let valueQuantity = valueQuantity { dict["valueQuantity"] = valueQuantity.toDictionary() }
+        if let valueString = valueString, valueString.isEmpty == false { dict["valueString"] = valueString }
+        if let valueBoolean = valueBoolean { dict["valueBoolean"] = valueBoolean }
         if let component = component { dict["component"] = component.map { $0.toDictionary() } }
+        if let interpretation = interpretation { dict["interpretation"] = interpretation.map { $0.toDictionary() } }
         if let note = note { dict["note"] = note.map { $0.toDictionary() } }
         
         return dict
@@ -282,10 +285,12 @@ extension Reference {
     }
 }
 
-extension ObservationComponent {
+extension FHIRObservationComponent {
     func toDictionary() -> [String: Any] {
         var dict: [String: Any] = ["code": code.toDictionary()]
         if let valueQuantity = valueQuantity { dict["valueQuantity"] = valueQuantity.toDictionary() }
+        if let valueString = valueString, valueString.isEmpty == false { dict["valueString"] = valueString }
+        if let valueBoolean = valueBoolean { dict["valueBoolean"] = valueBoolean }
         return dict
     }
 }

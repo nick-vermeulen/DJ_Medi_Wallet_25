@@ -32,7 +32,7 @@ enum PayloadEncoder {
     }
 
     private static func gzipCompress(data: Data) throws -> Data {
-        try data.withUnsafeBytes { sourceBuffer in
+        try data.withUnsafeBytes { (sourceBuffer: UnsafeRawBufferPointer) in
             guard let baseAddress = sourceBuffer.baseAddress else {
                 throw PayloadError.bufferFailure
             }
@@ -56,11 +56,17 @@ enum PayloadEncoder {
     private static func gzipDecompress(data: Data) throws -> Data {
         var decompressed = Data()
         let chunkSize = max(2048, data.count * 2)
-        try data.withUnsafeBytes { sourceBuffer in
+        try data.withUnsafeBytes { (sourceBuffer: UnsafeRawBufferPointer) in
             guard let baseAddress = sourceBuffer.baseAddress else {
                 throw PayloadError.bufferFailure
             }
-            var stream = compression_stream()
+            var stream = compression_stream(
+                dst_ptr: UnsafeMutablePointer<UInt8>(bitPattern: 0)!,
+                dst_size: 0,
+                src_ptr: UnsafePointer<UInt8>(bitPattern: 0)!,
+                src_size: 0,
+                state: nil
+            )
             var status = compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB)
             guard status != COMPRESSION_STATUS_ERROR else {
                 throw PayloadError.compressionFailed

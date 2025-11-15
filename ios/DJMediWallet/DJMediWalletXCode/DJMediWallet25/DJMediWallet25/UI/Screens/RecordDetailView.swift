@@ -113,7 +113,7 @@ struct ObservationDetails: View {
     }
     
     @ViewBuilder
-    private func observationView(for observation: Observation) -> some View {
+    private func observationView(for observation: FHIRObservation) -> some View {
         let rows = observationRows(for: observation)
         if rows.isEmpty {
             Text("No observation data available.")
@@ -136,7 +136,7 @@ struct ObservationDetails: View {
         }
     }
     
-    private func observationRows(for observation: Observation) -> [ObservationRow] {
+    private func observationRows(for observation: FHIRObservation) -> [ObservationRow] {
         var rows: [ObservationRow] = []
         rows.append(ObservationRow(label: "Status", value: observation.status.capitalized))
         if let codeText = observation.code.display ?? observation.code.coding?.first?.display ?? observation.code.coding?.first?.code {
@@ -163,7 +163,7 @@ struct ObservationDetails: View {
         return rows
     }
     
-    private func primaryResultText(for observation: Observation) -> String? {
+    private func primaryResultText(for observation: FHIRObservation) -> String? {
         if let quantity = observation.valueQuantity, let display = formatQuantity(quantity) {
             return display
         }
@@ -176,7 +176,7 @@ struct ObservationDetails: View {
         return nil
     }
     
-    private func componentResultText(_ component: ObservationComponent) -> String? {
+    private func componentResultText(_ component: FHIRObservationComponent) -> String? {
         if let quantity = component.valueQuantity, let display = formatQuantity(quantity) {
             return display
         }
@@ -208,7 +208,7 @@ struct ObservationDetails: View {
         return descriptions.joined(separator: ", ")
     }
     
-    private func formattedObservationDate(for observation: Observation) -> String? {
+    private func formattedObservationDate(for observation: FHIRObservation) -> String? {
         if let effective = observation.effectiveDateTime, let formatted = formattedObservationDateString(effective) {
             return formatted
         }

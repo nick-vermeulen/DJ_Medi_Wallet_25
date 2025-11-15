@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ObservationFormView: View {
-    let onSave: (Observation) -> Void
+    let onSave: (FHIRObservation) -> Void
     @Binding var isSaving: Bool
     
     @State private var observationType = "Blood Pressure"
@@ -162,13 +162,13 @@ struct ObservationFormView: View {
         onSave(observation)
     }
     
-    private func createObservation() -> Observation {
+    private func createObservation() -> FHIRObservation {
         let dateFormatter = ISO8601DateFormatter()
         let dateString = dateFormatter.string(from: Date())
         
         switch observationType {
         case "Blood Pressure":
-            return Observation(
+            return FHIRObservation(
                 id: UUID().uuidString,
                 status: "final",
                 category: [
@@ -193,7 +193,7 @@ struct ObservationFormView: View {
                 ),
                 effectiveDateTime: dateString,
                 component: [
-                    ObservationComponent(
+                    FHIRObservationComponent(
                         code: CodeableConcept(
                             coding: [
                                 Coding(
@@ -210,7 +210,7 @@ struct ObservationFormView: View {
                             code: "mm[Hg]"
                         )
                     ),
-                    ObservationComponent(
+                    FHIRObservationComponent(
                         code: CodeableConcept(
                             coding: [
                                 Coding(
@@ -232,7 +232,7 @@ struct ObservationFormView: View {
             )
             
         case "Heart Rate":
-            return Observation(
+            return FHIRObservation(
                 id: UUID().uuidString,
                 status: "final",
                 category: [
@@ -271,7 +271,7 @@ struct ObservationFormView: View {
             )
             
         case "Body Temperature":
-            return Observation(
+            return FHIRObservation(
                 id: UUID().uuidString,
                 status: "final",
                 category: [
@@ -310,7 +310,7 @@ struct ObservationFormView: View {
             )
             
         case "Weight":
-            return Observation(
+            return FHIRObservation(
                 id: UUID().uuidString,
                 status: "final",
                 category: [
@@ -349,7 +349,7 @@ struct ObservationFormView: View {
             )
             
         case "Height":
-            return Observation(
+            return FHIRObservation(
                 id: UUID().uuidString,
                 status: "final",
                 category: [

@@ -1,6 +1,6 @@
 import Foundation
 
-struct FHIRObservationInput: Identifiable, Hashable {
+struct FHIRObservationInput: Identifiable {
     let id: UUID
     var code: CodeableConcept
     var value: ObservationValue
@@ -69,7 +69,7 @@ struct FHIRPayloadBuilder {
     }
 
     func diagnosticReportBundle(subject: Reference?, report: FHIRDiagnosticReportInput) -> FHIRBundle {
-        let observationEntries = report.observations.map { input -> (Observation, BundleEntry) in
+        let observationEntries = report.observations.map { input -> (FHIRObservation, BundleEntry) in
             let resource = makeObservationResource(subject: subject, input: input)
             let entry = BundleEntry(fullUrl: "urn:uuid:\(resource.id ?? UUID().uuidString)", resource: .observation(resource))
             return (resource, entry)
@@ -92,7 +92,7 @@ struct FHIRPayloadBuilder {
         return FHIRBundle(type: "collection", entry: entries)
     }
 
-    private func makeObservationResource(subject: Reference?, input: FHIRObservationInput) -> Observation {
+    private func makeObservationResource(subject: Reference?, input: FHIRObservationInput) -> FHIRObservation {
         let valueQuantity: Quantity?
         let valueString: String?
         let valueBoolean: Bool?
@@ -110,7 +110,7 @@ struct FHIRPayloadBuilder {
             valueString = nil
             valueBoolean = bool
         }
-        return Observation(
+        return FHIRObservation(
             id: input.id.uuidString,
             status: "final",
             category: input.category,

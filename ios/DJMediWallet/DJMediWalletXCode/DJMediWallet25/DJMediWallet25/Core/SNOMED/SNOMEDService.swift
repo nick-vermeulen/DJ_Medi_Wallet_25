@@ -20,19 +20,11 @@ final class SNOMEDService: ObservableObject {
     }
 
     func refreshCategories() async {
-        do {
-            categories = try store.categoriesWithCounts()
-        } catch {
-            categories = []
-        }
+        categories = await store.categoriesWithCounts()
     }
 
     func search(term: String, category: String? = nil, limit: Int = 20) async -> [SNOMEDConcept] {
-        do {
-            return try store.concepts(matching: term, category: category, limit: limit)
-        } catch {
-            return []
-        }
+        await store.concepts(matching: term, category: category, limit: limit)
     }
 
     func importCSV(from url: URL) {
@@ -40,7 +32,7 @@ final class SNOMEDService: ObservableObject {
             importStatus = .importing
             do {
                 try await store.importCSV(from: url)
-                let total = try store.totalConcepts()
+                let total = await store.totalConcepts()
                 importStatus = .completed(total: total)
                 await refreshCategories()
             } catch {
@@ -50,10 +42,6 @@ final class SNOMEDService: ObservableObject {
     }
 
     func concept(withId conceptId: String) async -> SNOMEDConcept? {
-        do {
-            return try store.concept(withId: conceptId)
-        } catch {
-            return nil
-        }
+        await store.concept(withId: conceptId)
     }
 }

@@ -29,7 +29,7 @@ public struct BundleEntry: Codable {
 }
 
 public enum CodableResource: Codable {
-    case observation(Observation)
+    case observation(FHIRObservation)
     case diagnosticReport(DiagnosticReport)
 
     private enum CodingKeys: String, CodingKey {
@@ -41,7 +41,7 @@ public enum CodableResource: Codable {
         let resourceType = try container.decode(String.self, forKey: .resourceType)
         switch resourceType {
         case "Observation":
-            let observation = try Observation(from: decoder)
+            let observation = try FHIRObservation(from: decoder)
             self = .observation(observation)
         case "DiagnosticReport":
             let report = try DiagnosticReport(from: decoder)

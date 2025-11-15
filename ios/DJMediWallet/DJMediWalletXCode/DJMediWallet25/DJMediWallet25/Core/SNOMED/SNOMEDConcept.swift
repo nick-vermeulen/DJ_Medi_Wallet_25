@@ -1,12 +1,12 @@
 import Foundation
-import SwiftData
 
-@Model
-final class SNOMEDConcept {
-    @Attribute(.unique) var conceptId: String
+struct SNOMEDConcept: Codable, Hashable, Identifiable, Sendable {
+    let conceptId: String
     var term: String
     var category: String
     var lastUpdated: Date
+
+    var id: String { conceptId }
 
     init(conceptId: String, term: String, category: String, lastUpdated: Date = Date()) {
         self.conceptId = conceptId
