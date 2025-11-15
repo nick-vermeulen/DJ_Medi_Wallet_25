@@ -125,6 +125,7 @@
 			);
 			name = DJMediWallet25;
 			packageProductDependencies = (
+				4469C3A12F0F83FD0078E2D4 /* Supabase */,
 			);
 			productName = DJMediWallet25;
 			productReference = 04EA6E9B2EC7D1C8002601A8 /* DJMediWallet25.app */;
@@ -212,6 +213,9 @@
 			productRefGroup = 04EA6E9C2EC7D1C8002601A8 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
+			packageReferences = (
+				4469C3A02F0F83FD0078E2D4 /* XCRemoteSwiftPackageReference "supabase-swift" */,
+			);
 			targets = (
 				04EA6E9A2EC7D1C8002601A8 /* DJMediWallet25 */,
 				04EA6EAB2EC7D1C9002601A8 /* DJMediWallet25Tests */,
@@ -311,6 +315,26 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.LazyJack.DJMediWallet25;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+
+				/* Begin XCRemoteSwiftPackageReference section */
+					4469C3A02F0F83FD0078E2D4 /* XCRemoteSwiftPackageReference "supabase-swift" */ = {
+						isa = XCRemoteSwiftPackageReference;
+						repositoryURL = "https://github.com/supabase/supabase-swift.git";
+						requirement = {
+							kind = upToNextMajorVersion;
+							minimumVersion = 2.0.0;
+						};
+					};
+				/* End XCRemoteSwiftPackageReference section */
+
+				/* Begin XCSwiftPackageProductDependency section */
+					4469C3A12F0F83FD0078E2D4 /* Supabase */ = {
+						isa = XCSwiftPackageProductDependency;
+						package = 4469C3A02F0F83FD0078E2D4 /* XCRemoteSwiftPackageReference "supabase-swift" */;
+						productName = Supabase;
+					};
+				/* End XCSwiftPackageProductDependency section */
+
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
 				SWIFT_EMIT_LOC_STRINGS = YES;

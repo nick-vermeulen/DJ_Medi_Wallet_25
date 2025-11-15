@@ -122,27 +122,54 @@ struct RecordsListView: View {
             }
         }
 
-        if !walletManager.isWalletInitialized() {
-            await withCheckedContinuation { continuation in
-                walletManager.initializeWallet { _ in
-                    continuation.resume()
+        do {
+            try await walletManager.initializeWalletIfNeeded()
+
+            var fetchedCredentials: [MedicalCredential] = []
+            var alreadyLoaded = false
+
+            if let profile = lockManager.userProfile,
+               let idString = profile.externalUserId,
+               let patientId = UUID(uuidString: idString) {
+                do {
+                    fetchedCredentials = try await walletManager.syncPatientRecordsFromSupabase(patientId: patientId)
+                    alreadyLoaded = true
+                } catch let error as SupabaseService.ServiceError {
+                    switch error {
+                    case .misconfigured:
+                        // Fall back to local cache when Supabase isn't configured.
+                        fetchedCredentials = try await walletManager.getAllCredentialsAsync()
+                        alreadyLoaded = true
+                    case .notAuthenticated, .invalidUserIdentifier:
+                        fetchedCredentials = try await walletManager.getAllCredentialsAsync()
+                        alreadyLoaded = true
+                        await MainActor.run {
+                            errorMessage = "Sign in to Supabase to refresh your records."
+                        }
+                    case .requestFailed(let message):
+                        fetchedCredentials = try await walletManager.getAllCredentialsAsync()
+                        alreadyLoaded = true
+                        await MainActor.run {
+                            errorMessage = "Could not sync from Supabase: \(message)"
+                        }
+                    }
                 }
             }
-        }
 
-        await withCheckedContinuation { continuation in
-            walletManager.getAllCredentials { result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let credentials):
-                        records = credentials.map { RecordItem(from: $0) }
-                    case .failure(let error):
-                        records = []
-                        errorMessage = "Unable to load records: \(error.localizedDescription)"
-                    }
-                    isLoading = false
-                    continuation.resume()
-                }
+            if !alreadyLoaded {
+                // If we didn't already populate credentials from Supabase, ensure local cache is loaded.
+                fetchedCredentials = try await walletManager.getAllCredentialsAsync()
+            }
+
+            await MainActor.run {
+                records = fetchedCredentials.map { RecordItem(from: $0) }
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                records = []
+                isLoading = false
+                errorMessage = "Unable to load records: \(error.localizedDescription)"
             }
         }
     }

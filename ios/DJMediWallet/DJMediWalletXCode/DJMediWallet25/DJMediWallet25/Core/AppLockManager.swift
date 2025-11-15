@@ -29,10 +29,11 @@ final class AppLockManager: ObservableObject {
             }
         }
         
-        var firstName: String
-        var lastName: String
-        var role: Role
-        var consentTimestamp: Date
+    var firstName: String
+    var lastName: String
+    var role: Role
+    var consentTimestamp: Date
+    var externalUserId: String?
         
         var normalizedFirstName: String {
             firstName.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -42,11 +43,12 @@ final class AppLockManager: ObservableObject {
             lastName.trimmingCharacters(in: .whitespacesAndNewlines)
         }
         
-        init(firstName: String, lastName: String, role: Role, consentTimestamp: Date = Date()) {
+        init(firstName: String, lastName: String, role: Role, consentTimestamp: Date = Date(), externalUserId: String? = nil) {
             self.firstName = firstName
             self.lastName = lastName
             self.role = role
             self.consentTimestamp = consentTimestamp
+            self.externalUserId = externalUserId
         }
         
         private enum CodingKeys: String, CodingKey {
@@ -54,6 +56,7 @@ final class AppLockManager: ObservableObject {
             case lastName
             case role
             case consentTimestamp
+            case externalUserId
         }
         
         init(from decoder: Decoder) throws {
@@ -62,6 +65,7 @@ final class AppLockManager: ObservableObject {
             lastName = try container.decode(String.self, forKey: .lastName)
             role = try container.decode(Role.self, forKey: .role)
             consentTimestamp = try container.decodeIfPresent(Date.self, forKey: .consentTimestamp) ?? Date()
+            externalUserId = try container.decodeIfPresent(String.self, forKey: .externalUserId)
         }
         
         func encode(to encoder: Encoder) throws {
@@ -70,6 +74,7 @@ final class AppLockManager: ObservableObject {
             try container.encode(lastName, forKey: .lastName)
             try container.encode(role, forKey: .role)
             try container.encode(consentTimestamp, forKey: .consentTimestamp)
+            try container.encodeIfPresent(externalUserId, forKey: .externalUserId)
         }
     }
     
@@ -321,7 +326,7 @@ final class AppLockManager: ObservableObject {
             throw SetupError.profileIncomplete
         }
         let consentDate = profile.consentTimestamp
-        let cleanedProfile = UserProfile(firstName: trimmedFirst, lastName: trimmedLast, role: profile.role, consentTimestamp: consentDate)
+    let cleanedProfile = UserProfile(firstName: trimmedFirst, lastName: trimmedLast, role: profile.role, consentTimestamp: consentDate, externalUserId: profile.externalUserId)
         do {
             try await storeProfileMetadata(cleanedProfile)
             persistProfileToDefaults(cleanedProfile)

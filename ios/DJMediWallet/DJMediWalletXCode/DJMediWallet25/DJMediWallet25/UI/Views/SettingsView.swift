@@ -21,11 +21,10 @@ struct SettingsView: View {
     @State private var profileErrorMessage: String?
     @State private var roleConfirmationPending = false
     @State private var pendingRole: AppLockManager.UserProfile.Role?
-    @State private var shouldPersistAfterRoleConfirmation = false
-    @State private var roleChangeConfirmed = false
-    
+    @State private var previousRoleBeforeConfirmation: AppLockManager.UserProfile.Role?
+
     private let lockOptions: [LockTimeoutOption] = LockTimeoutOption.all
-    
+
     var body: some View {
         NavigationStack {
             Form {
@@ -36,40 +35,23 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .disabled(isSavingProfile)
-            .task {
-                guard isLoadingProfile else { return }
-                await loadProfile()
-            }
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    if isSavingProfile {
-                        ProgressView()
-                    } else {
-                        Button("Save", action: saveProfile)
-                            .disabled(!hasProfileChanges || !isProfileValid)
-                    }
-                }
-            }
+            .task { await ensureProfileLoaded() }
+            .toolbar { saveToolbar }
             .confirmationDialog(
                 "Confirm Role Change",
                 isPresented: $roleConfirmationPending,
                 presenting: pendingRole
             ) { role in
                 Button("Switch to \(role.displayName)", role: .destructive) {
-                    selectedRole = role
-                    roleChangeConfirmed = true
-                    if shouldPersistAfterRoleConfirmation {
-                        Task { await persistProfile() }
-                    }
-                    shouldPersistAfterRoleConfirmation = false
                     pendingRole = nil
+                    previousRoleBeforeConfirmation = nil
                 }
                 Button("Cancel", role: .cancel) {
-                    if shouldPersistAfterRoleConfirmation {
-                        selectedRole = storedProfile?.role ?? .patient
+                    if let previousRoleBeforeConfirmation {
+                        selectedRole = previousRoleBeforeConfirmation
                     }
-                    shouldPersistAfterRoleConfirmation = false
                     pendingRole = nil
+                    previousRoleBeforeConfirmation = nil
                 }
             } message: { role in
                 Text("Switching to the \(role.displayName) experience changes how data is presented. Confirm to proceed.")
@@ -79,54 +61,19 @@ struct SettingsView: View {
                     passphrase: presentedPassphrase,
                     errorMessage: $passphraseError,
                     onRegenerate: generatePassphraseForReset,
-                    onConfirm: {
-                        do {
-                            try lockManager.storeRecoveryPassphrase(words: presentedPassphrase)
-                            passphraseError = nil
-                            isResettingPassphrase = false
-                        } catch {
-                            passphraseError = "Unable to store passphrase. Please try again."
-                        }
-                    },
-                    onCancel: {
-                        isResettingPassphrase = false
-                        passphraseError = nil
-                    }
+                    onConfirm: handlePassphraseResetConfirmation,
+                    onCancel: handlePassphraseResetCancellation
                 )
             }
         }
     }
-    
-    private var lockTimeoutBinding: Binding<TimeInterval> {
-        Binding(
-            get: { lockManager.lockTimeout },
-            set: { lockManager.updateLockTimeout(to: $0) }
-        )
-    }
 
-    private var trimmedFirstName: String {
-        firstName.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    
-    private var trimmedLastName: String {
-        lastName.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-    
-    private var isProfileValid: Bool {
-        !trimmedFirstName.isEmpty && !trimmedLastName.isEmpty
-    }
-    
-    private var hasProfileChanges: Bool {
-        guard let storedProfile else { return isProfileValid }
-        return storedProfile.firstName != trimmedFirstName
-            || storedProfile.lastName != trimmedLastName
-            || storedProfile.role != selectedRole
-    }
-    
+    // MARK: - Sections
+
     private var profileSection: some View {
         Section(header: Text("Profile"), footer: profileFooter) {
             if isLoadingProfile && storedProfile == nil {
-                ProgressView("Loading profile…")
+                ProgressView("Loading profile...")
                     .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 TextField("First Name", text: $firstName)
@@ -144,7 +91,7 @@ struct SettingsView: View {
             }
         }
     }
-    
+
     private var securitySection: some View {
         Section(header: Text("Security")) {
             Picker("Auto-Lock", selection: lockTimeoutBinding) {
@@ -159,23 +106,26 @@ struct SettingsView: View {
 
     private var biometricsSection: some View {
         Section {
-            Label(lockManager.biometricsEnabled ? "Biometrics Enabled" : "Biometrics Disabled",
-                  systemImage: lockManager.biometricsEnabled ? "faceid" : "lock")
-                .foregroundColor(lockManager.biometricsEnabled ? .green : .secondary)
+            Label(
+                lockManager.biometricsEnabled ? "Biometrics Enabled" : "Biometrics Disabled",
+                systemImage: lockManager.biometricsEnabled ? "faceid" : "lock"
+            )
+            .foregroundColor(lockManager.biometricsEnabled ? .green : .secondary)
         } footer: {
-            Text(lockManager.biometricsEnabled
-                 ? "Manage Face ID or Touch ID permissions in the iOS Settings app."
-                 : "Biometric authentication is currently disabled. Enable it during onboarding or from system settings.")
+            Text(
+                lockManager.biometricsEnabled
+                ? "Manage Face ID or Touch ID permissions in the iOS Settings app."
+                : "Biometric authentication is currently disabled. Enable it during onboarding or from system settings."
+            )
         }
     }
 
     private var recoverySection: some View {
-        Section(header: Text("Recovery"), footer: Text("Resetting your passphrase invalidates any previous recovery phrases.")) {
-            Button {
-                generatePassphraseForReset()
-            } label: {
-                Text("Reset Recovery Passphrase")
-            }
+        Section(
+            header: Text("Recovery"),
+            footer: Text("Resetting your passphrase invalidates any previous recovery phrases.")
+        ) {
+            Button("Reset Recovery Passphrase", action: generatePassphraseForReset)
         }
     }
 
@@ -192,7 +142,27 @@ struct SettingsView: View {
             }
         }
     }
-    
+
+    private var saveToolbar: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            if isSavingProfile {
+                ProgressView()
+            } else {
+                Button("Save", action: saveProfile)
+                    .disabled(!hasProfileChanges || !isProfileValid)
+            }
+        }
+    }
+
+    // MARK: - Bindings
+
+    private var lockTimeoutBinding: Binding<TimeInterval> {
+        Binding(
+            get: { lockManager.lockTimeout },
+            set: { lockManager.updateLockTimeout(to: $0) }
+        )
+    }
+
     private var roleSelectionBinding: Binding<AppLockManager.UserProfile.Role> {
         Binding(
             get: { selectedRole },
@@ -201,37 +171,56 @@ struct SettingsView: View {
                 if storedProfile == nil {
                     selectedRole = newRole
                 } else {
+                    previousRoleBeforeConfirmation = selectedRole
+                    selectedRole = newRole
                     pendingRole = newRole
                     roleConfirmationPending = true
                 }
             }
         )
     }
-    
-    private func consentDescription(for profile: AppLockManager.UserProfile) -> String? {
-        Self.consentFormatter.localizedString(for: profile.consentTimestamp, relativeTo: Date())
+
+    // MARK: - Derived State
+
+    private var trimmedFirstName: String {
+        firstName.trimmingCharacters(in: .whitespacesAndNewlines)
     }
-    
-    private static let consentFormatter: RelativeDateTimeFormatter = {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .full
-        return formatter
-    }()
-    
+
+    private var trimmedLastName: String {
+        lastName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var isProfileValid: Bool {
+        !trimmedFirstName.isEmpty && !trimmedLastName.isEmpty
+    }
+
+    private var hasProfileChanges: Bool {
+        guard let storedProfile else { return isProfileValid }
+        return storedProfile.firstName != trimmedFirstName
+            || storedProfile.lastName != trimmedLastName
+            || storedProfile.role != selectedRole
+    }
+
+    // MARK: - Actions
+
+    private func ensureProfileLoaded() async {
+        guard isLoadingProfile else { return }
+        await loadProfile()
+    }
+
     private func saveProfile() {
         profileErrorMessage = nil
         guard isProfileValid else {
             profileErrorMessage = "Please enter both your first and last name."
             return
         }
-        if storedProfile != nil && selectedRole != storedProfile?.role {
-            roleConfirmationPending = true
-            pendingRole = selectedRole
-        } else {
-            Task { await persistProfile() }
+        guard !roleConfirmationPending else {
+            profileErrorMessage = "Confirm your role selection to continue."
+            return
         }
+        Task { await persistProfile() }
     }
-    
+
     private func persistProfile() async {
         await MainActor.run {
             isSavingProfile = true
@@ -270,46 +259,69 @@ struct SettingsView: View {
             }
         }
     }
-    
+
     private func loadProfile() async {
         let loadedProfile = await lockManager.loadUserProfile() ?? lockManager.userProfile
         await MainActor.run {
-            self.storedProfile = loadedProfile
+            storedProfile = loadedProfile
             if let profile = loadedProfile {
-                self.firstName = profile.firstName
-                self.lastName = profile.lastName
-                self.selectedRole = profile.role
+                firstName = profile.firstName
+                lastName = profile.lastName
+                selectedRole = profile.role
             }
-            self.isLoadingProfile = false
+            previousRoleBeforeConfirmation = nil
+            pendingRole = nil
+            roleConfirmationPending = false
+            isLoadingProfile = false
         }
     }
-    
+
     private func generatePassphraseForReset() {
         do {
-            presentedPassphrase = []
             presentedPassphrase = try lockManager.generateRecoveryPassphrase()
             passphraseError = nil
             isResettingPassphrase = true
         } catch {
-                if storedProfile == nil {
-                    selectedRole = newRole
-                    roleChangeConfirmed = true
-                } else {
-                    pendingRole = newRole
-                    roleConfirmationPending = true
-                    shouldPersistAfterRoleConfirmation = false
-                    roleChangeConfirmed = false
-                }
+            passphraseError = "Unable to generate passphrase."
+            isResettingPassphrase = true
+        }
+    }
+
+    private func handlePassphraseResetConfirmation() {
+        do {
+            try lockManager.storeRecoveryPassphrase(words: presentedPassphrase)
+            passphraseError = nil
+            isResettingPassphrase = false
+        } catch {
+            passphraseError = "Unable to store passphrase. Please try again."
+        }
+    }
+
+    private func handlePassphraseResetCancellation() {
+        isResettingPassphrase = false
+        passphraseError = nil
+    }
+
+    // MARK: - Helpers
+
+    private func consentDescription(for profile: AppLockManager.UserProfile) -> String? {
+        Self.consentFormatter.localizedString(for: profile.consentTimestamp, relativeTo: Date())
+    }
+
+    private static let consentFormatter: RelativeDateTimeFormatter = {
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .full
+        return formatter
+    }()
 }
 
 private struct LockTimeoutOption: Identifiable {
     var id: TimeInterval { duration }
     let label: String
     let duration: TimeInterval
-    
+
     static let all: [LockTimeoutOption] = [
         LockTimeoutOption(label: "Immediately", duration: 0),
-                shouldPersistAfterRoleConfirmation = false
         LockTimeoutOption(label: "30 Seconds", duration: 30),
         LockTimeoutOption(label: "1 Minute", duration: 60),
         LockTimeoutOption(label: "5 Minutes", duration: 300)
@@ -322,10 +334,9 @@ private struct PassphraseResetSheet: View {
     let onRegenerate: () -> Void
     let onConfirm: () -> Void
     let onCancel: () -> Void
-    
+
     var body: some View {
         NavigationStack {
-                    roleChangeConfirmed = false
             VStack(spacing: 24) {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -335,7 +346,7 @@ private struct PassphraseResetSheet: View {
                         Text("Write down this new 12-word passphrase and store it securely. It replaces any previous recovery phrases.")
                             .foregroundColor(.secondary)
                         if passphrase.isEmpty {
-                            ProgressView("Generating secure words…")
+                            ProgressView("Generating secure words...")
                                 .frame(maxWidth: .infinity, alignment: .center)
                                 .padding(.vertical)
                         } else {
@@ -345,7 +356,6 @@ private struct PassphraseResetSheet: View {
                         if let errorMessage {
                             Text(errorMessage)
                                 .foregroundColor(.red)
-                self.roleChangeConfirmed = false
                         }
                     }
                     .padding()

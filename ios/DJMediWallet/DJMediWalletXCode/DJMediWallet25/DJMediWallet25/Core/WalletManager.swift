@@ -17,6 +17,7 @@ public class WalletManager: ObservableObject {
     private let securityManager: SecurityManager
     private let credentialManager: CredentialManager
     private let storage: SecureStorage
+    private let supabaseService: SupabaseService
     public let config: WalletConfig
     
     /// Shared instance with default configuration
@@ -33,6 +34,7 @@ public class WalletManager: ObservableObject {
         self.securityManager = SecurityManager(config: config)
         self.credentialManager = CredentialManager()
         self.storage = SecureStorage(serviceName: config.serviceName)
+    self.supabaseService = SupabaseService.shared
     }
     
     /// Builder for creating wallet with custom configuration
@@ -151,6 +153,87 @@ public class WalletManager: ObservableObject {
     public func deleteCredential(id: String, completion: @escaping (Result<Void, WalletError>) -> Void) {
         storage.deleteCredential(id: id) { result in
             completion(result)
+        }
+    }
+
+    // MARK: - Supabase Integration
+
+    /// Ensures the secure storage layer is initialized before performing operations.
+    public func initializeWalletIfNeeded() async throws {
+        guard !isWalletInitialized() else { return }
+        try await withCheckedThrowingContinuation { continuation in
+            initializeWallet { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: ())
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Retrieves all credentials from secure storage using Swift concurrency.
+    public func getAllCredentialsAsync() async throws -> [MedicalCredential] {
+        try await withCheckedThrowingContinuation { continuation in
+            getAllCredentials { result in
+                switch result {
+                case .success(let credentials):
+                    continuation.resume(returning: credentials)
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// Synchronizes the local credential store with the records returned by Supabase for the specified patient.
+    /// - Parameter patientId: The Supabase user identifier representing the patient.
+    /// - Returns: The list of credentials fetched from Supabase after they are stored locally.
+    public func syncPatientRecordsFromSupabase(patientId: UUID) async throws -> [MedicalCredential] {
+        let remoteCredentials = try await supabaseService.fetchPatientRecords(for: patientId)
+        try await synchronizeLocalStore(with: remoteCredentials)
+        return remoteCredentials
+    }
+
+    private func synchronizeLocalStore(with remoteCredentials: [MedicalCredential]) async throws {
+        let existing = try await getAllCredentialsAsync()
+        let existingIds = Set(existing.map { $0.id })
+        let remoteIds = Set(remoteCredentials.map { $0.id })
+
+        let idsToDelete = existingIds.subtracting(remoteIds)
+        for identifier in idsToDelete {
+            try await deleteCredentialAsync(id: identifier)
+        }
+
+        for credential in remoteCredentials {
+            try await storeCredentialAsync(credential)
+        }
+    }
+
+    private func storeCredentialAsync(_ credential: MedicalCredential) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            storage.storeCredential(credential) { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: ())
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    private func deleteCredentialAsync(id: String) async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            storage.deleteCredential(id: id) { result in
+                switch result {
+                case .success:
+                    continuation.resume(returning: ())
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
         }
     }
 
