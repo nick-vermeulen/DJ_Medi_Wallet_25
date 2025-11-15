@@ -42,10 +42,8 @@ struct RecordsListView: View {
                     await refreshRecords()
                 }
                 .sheet(isPresented: $isPresentingAddRecord) {
-                    NavigationStack {
-                        AddRecordView {
-                            Task { await refreshRecords() }
-                        }
+                    AddRecordView {
+                        Task { await refreshRecords() }
                     }
                     .environmentObject(walletManager)
                 }

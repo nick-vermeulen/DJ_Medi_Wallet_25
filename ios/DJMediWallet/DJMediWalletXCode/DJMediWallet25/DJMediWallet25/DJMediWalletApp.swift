@@ -10,11 +10,13 @@ import SwiftUI
 @main
 struct DJMediWalletApp25: App {
     @StateObject private var walletManager = WalletManager.shared
+    @StateObject private var lockManager = AppLockManager()
     
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            AppRootView()
                 .environmentObject(walletManager)
+                .environmentObject(lockManager)
         }
     }
 }
