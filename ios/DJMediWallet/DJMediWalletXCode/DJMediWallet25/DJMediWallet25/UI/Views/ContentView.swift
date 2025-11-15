@@ -8,23 +8,17 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedTab = 0
-    
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView {
             RecordsListView()
                 .tabItem {
                     Label("Records", systemImage: "folder.fill")
                 }
-                .tag(0)
             
-            AddRecordView {
-                selectedTab = 0
-            }
+            SettingsView()
                 .tabItem {
-                    Label("Add", systemImage: "plus.circle.fill")
+                    Label("Settings", systemImage: "gearshape.fill")
                 }
-                .tag(1)
         }
     }
 }

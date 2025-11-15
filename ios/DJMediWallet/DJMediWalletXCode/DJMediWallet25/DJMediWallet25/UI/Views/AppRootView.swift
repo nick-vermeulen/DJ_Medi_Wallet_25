@@ -27,8 +27,13 @@ struct AppRootView: View {
             }
         }
         .onChange(of: scenePhase) { phase in
-            if phase == .background {
-                lockManager.lock()
+            switch phase {
+            case .active:
+                lockManager.cancelAutoLock()
+            case .inactive, .background:
+                lockManager.scheduleAutoLock()
+            @unknown default:
+                break
             }
         }
     }

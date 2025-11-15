@@ -24,7 +24,15 @@ struct KeychainService {
         addQuery[kSecAttrAccessible as String] = accessibility
         
         let status = SecItemAdd(addQuery as CFDictionary, nil)
-        guard status == errSecSuccess else {
+        if status == errSecParam || status == errSecDecode {
+            var fallbackQuery = baseQuery
+            fallbackQuery[kSecValueData as String] = data
+            fallbackQuery[kSecAttrAccessible as String] = kSecAttrAccessibleWhenUnlockedThisDeviceOnly
+            let fallbackStatus = SecItemAdd(fallbackQuery as CFDictionary, nil)
+            guard fallbackStatus == errSecSuccess else {
+                throw KeychainError.unhandledStatus(fallbackStatus)
+            }
+        } else if status != errSecSuccess {
             throw KeychainError.unhandledStatus(status)
         }
     }

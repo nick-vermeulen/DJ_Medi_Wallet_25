@@ -81,27 +81,69 @@ public class SecurityManager {
         var flags: SecAccessControlCreateFlags = []
         
         if config.userAuthenticationRequired {
-            if #available(iOS 11.3, *) {
-                flags.insert(.biometryCurrentSet)
+            let context = LAContext()
+            var error: NSError?
+            let supportsBiometrics = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error)
+            if supportsBiometrics {
+                if #available(iOS 11.3, *) {
+                    flags.insert(.biometryCurrentSet)
+                } else {
+                    flags.insert(.touchIDCurrentSet)
+                }
             } else {
-                flags.insert(.touchIDCurrentSet)
+                flags.insert(.devicePasscode)
             }
+            flags.insert(.userPresence)
             flags.insert(.privateKeyUsage)
         }
         
-        let access = SecAccessControlCreateWithFlags(
+        if let access = SecAccessControlCreateWithFlags(
             nil,
             kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
             flags,
             nil
-        )!
+        ) {
+            return access
+        }
         
-        return access
+        // Fallback: remove strict flags and try again
+        if let fallback = SecAccessControlCreateWithFlags(
+            nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            config.userAuthenticationRequired ? [.userPresence] : [],
+            nil
+        ) {
+            return fallback
+        }
+        
+        // As a last resort, return access control without additional flags
+        return SecAccessControlCreateWithFlags(
+            nil,
+            kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
+            [],
+            nil
+        )!
     }
     
-    /// Check if device key pair exists
+    /// Check if device key pair exists without prompting for authentication
     public func hasDeviceKeyPair() -> Bool {
-        return retrievePrivateKey() != nil
+        var query: [String: Any] = [
+            kSecClass as String: kSecClassKey,
+            kSecAttrApplicationTag as String: deviceKeyTag,
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+
+        if let accessGroup = config.accessGroup {
+            query[kSecAttrAccessGroup as String] = accessGroup
+        }
+
+        if config.userAuthenticationRequired {
+            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        }
+
+        let status = SecItemCopyMatching(query as CFDictionary, nil)
+        return status == errSecSuccess || status == errSecInteractionNotAllowed
     }
     
     /// Store Secure Enclave private key in Keychain
@@ -167,29 +209,32 @@ public class SecurityManager {
         var query: [String: Any] = [
             kSecClass as String: kSecClassKey,
             kSecAttrApplicationTag as String: deviceKeyTag,
+            kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
             kSecReturnData as String: true
         ]
-        
+
         if let accessGroup = config.accessGroup {
             query[kSecAttrAccessGroup as String] = accessGroup
         }
-        
-        // Add authentication context if required
+
         if config.userAuthenticationRequired {
             let context = LAContext()
             context.localizedReason = "Authenticate to access your medical credentials"
+            if #available(iOS 13.4, *) {
+                context.touchIDAuthenticationAllowableReuseDuration = config.authenticationTimeout
+            }
             query[kSecUseAuthenticationContext as String] = context
         }
-        
+
         var item: CFTypeRef?
         let status = SecItemCopyMatching(query as CFDictionary, &item)
-        
+
         guard status == errSecSuccess,
               let keyData = item as? Data,
               let privateKey = try? P256.Signing.PrivateKey(rawRepresentation: keyData) else {
             return nil
         }
-        
+
         return privateKey
     }
     

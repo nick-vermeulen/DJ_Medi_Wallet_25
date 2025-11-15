@@ -26,6 +26,7 @@ final class AppLockManager: ObservableObject {
     
     @Published private(set) var lockState: LockState
     @Published var lastErrorMessage: String?
+    @Published var lockTimeout: TimeInterval
     
     private let walletManager: WalletManager
     private let keychain: KeychainService
@@ -34,6 +35,9 @@ final class AppLockManager: ObservableObject {
     private let onboardingKey = "com.djmediwallet.onboarding.completed"
     private let biometricsKey = "com.djmediwallet.biometrics.enabled"
     private let passcodeKey = "com.djmediwallet.passcode.hash"
+    private let lockTimeoutKey = "com.djmediwallet.lock.timeout"
+
+    private var lockWorkItem: DispatchWorkItem?
     
     init(
         walletManager: WalletManager? = nil,
@@ -43,6 +47,12 @@ final class AppLockManager: ObservableObject {
         self.walletManager = walletManager ?? WalletManager.shared
         self.keychain = keychain
         self.defaults = defaults
+        if let storedTimeout = defaults.object(forKey: lockTimeoutKey) as? Double {
+            self.lockTimeout = storedTimeout
+        } else {
+            self.lockTimeout = 60
+            defaults.set(lockTimeout, forKey: lockTimeoutKey)
+        }
         
         if defaults.bool(forKey: onboardingKey) {
             self.lockState = .locked
@@ -100,6 +110,7 @@ final class AppLockManager: ObservableObject {
         
         lastErrorMessage = nil
         lockState = .unlocked
+        cancelAutoLock()
     }
     
     func unlockWithBiometrics() async {
@@ -113,6 +124,7 @@ final class AppLockManager: ObservableObject {
         switch result {
         case .success:
             lockState = .unlocked
+            cancelAutoLock()
         case .failure:
             lastErrorMessage = "Biometric authentication failed."
         }
@@ -128,6 +140,7 @@ final class AppLockManager: ObservableObject {
             if storedData == provided {
                 lastErrorMessage = nil
                 lockState = .unlocked
+                cancelAutoLock()
             } else {
                 lastErrorMessage = "Incorrect passcode."
             }
@@ -138,12 +151,43 @@ final class AppLockManager: ObservableObject {
     
     func lock() {
         guard hasCompletedOnboarding else { return }
+        lockWorkItem?.cancel()
+        lockWorkItem = nil
         lastErrorMessage = nil
         lockState = .locked
     }
     
     func resetError() {
         lastErrorMessage = nil
+    }
+
+    func updateLockTimeout(to interval: TimeInterval) {
+        lockTimeout = interval
+        defaults.set(interval, forKey: lockTimeoutKey)
+    }
+
+    func scheduleAutoLock() {
+        guard lockState == .unlocked else { return }
+        lockWorkItem?.cancel()
+        let interval = lockTimeout
+        guard interval > 0 else {
+            lock()
+            return
+        }
+
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            Task { @MainActor in
+                self.lock()
+            }
+        }
+        lockWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + interval, execute: workItem)
+    }
+
+    func cancelAutoLock() {
+        lockWorkItem?.cancel()
+        lockWorkItem = nil
     }
     
     private func initializeWalletIfNeeded() async throws {
