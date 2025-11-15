@@ -24,10 +24,6 @@ struct OnboardingFlowView: View {
     
     private let totalSteps = 5
     
-    private var canCompleteSetup: Bool {
-        hasAcknowledgedCompliance && didConfirmPassphrase && hasStoredProfile
-    }
-    
     var body: some View {
         VStack(spacing: 24) {
             ProgressView(value: Double(currentStep + 1), total: Double(totalSteps))
@@ -75,7 +71,7 @@ struct OnboardingFlowView: View {
                 }
                 .tag(3)
                 
-                SecuritySetupView(canComplete: canCompleteSetup) {
+                SecuritySetupView {
                     retreat()
                 }
                 .tag(4)
@@ -89,6 +85,18 @@ struct OnboardingFlowView: View {
             generatePassphraseIfNeeded(force: false)
             didConfirmPassphrase = false
             profileError = nil
+        }
+        .onChange(of: currentStep) { _, newStep in
+            if newStep == 2 {
+                generatePassphraseIfNeeded(force: false)
+            } else if newStep == 3, confirmationIndices.isEmpty {
+                generateConfirmationIndices()
+            }
+        }
+        .onChange(of: passphrase) { _, newValue in
+            if !newValue.isEmpty, confirmationIndices.isEmpty {
+                generateConfirmationIndices()
+            }
         }
         .task {
             _ = await lockManager.loadUserProfile()
@@ -351,7 +359,7 @@ private struct PassphraseDisplayStep: View {
     @Binding var errorMessage: String?
     let onContinue: () -> Void
     let onGenerate: () -> Void
-    
+
     var body: some View {
         VStack(spacing: 24) {
             ScrollView {
@@ -361,13 +369,7 @@ private struct PassphraseDisplayStep: View {
                         .fontWeight(.semibold)
                     Text("Write down these 12 words in order. This passphrase is required to regain access if you forget your passcode or lose biometric access.")
                         .foregroundColor(.secondary)
-                    if passphrase.isEmpty {
-                        ProgressView("Generating secure words…")
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    } else {
-                        PassphraseWordGrid(words: passphrase)
-                            .padding(.vertical)
-                    }
+                    PassphraseWordGrid(words: passphrase)
                     if let errorMessage {
                         Text(errorMessage)
                             .foregroundColor(.red)
@@ -375,6 +377,7 @@ private struct PassphraseDisplayStep: View {
                 }
                 .padding()
             }
+            .scrollDismissesKeyboard(.interactively)
             HStack {
                 Button(action: onGenerate) {
                     Text("Regenerate")
@@ -475,7 +478,9 @@ private struct PassphraseConfirmStep: View {
     }
     
     private var isComplete: Bool {
-        inputs.count == indices.count && indices.allSatisfy { !(inputs[$0]?.isEmpty ?? true) }
+        !indices.isEmpty &&
+        inputs.count == indices.count &&
+        indices.allSatisfy { !(inputs[$0]?.isEmpty ?? true) }
     }
     
     private func binding(for index: Int) -> Binding<String> {

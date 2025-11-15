@@ -10,7 +10,6 @@ import LocalAuthentication
 
 struct SecuritySetupView: View {
     @EnvironmentObject private var lockManager: AppLockManager
-    let canComplete: Bool
     let onBack: () -> Void
     
     @State private var passcode = ""
@@ -92,7 +91,7 @@ struct SecuritySetupView: View {
     }
     
     private var isActionEnabled: Bool {
-        canComplete && passcode.count == 6 && passcode == confirmPasscode
+        passcode.count == 6 && passcode == confirmPasscode && !isProcessing
     }
     
     private func sanitized(_ input: String) -> String {
@@ -161,7 +160,7 @@ struct SecuritySetupView: View {
             .background(isActionEnabled ? Color.blue : Color.gray.opacity(0.4))
             .foregroundColor(.white)
             .cornerRadius(12)
-            .disabled(!isActionEnabled || isProcessing)
+            .disabled(!isActionEnabled)
         }
         .padding(.horizontal)
         .padding(.top, 12)

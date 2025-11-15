@@ -11,6 +11,7 @@ import Security
 enum PassphraseError: Error {
     case entropyUnavailable
     case invalidWordCount
+    case dictionaryTooSmall
 }
 
 /// Responsible for creating pronounceable, high-entropy passphrases
@@ -22,12 +23,16 @@ struct PassphraseManager {
         let words = PassphraseDictionary.words
         let dictionarySize = words.count
         guard dictionarySize > 0 else { throw PassphraseError.entropyUnavailable }
-        var result: [String] = []
-        for _ in 0..<wordCount {
+        guard dictionarySize >= wordCount else { throw PassphraseError.dictionaryTooSmall }
+        var selectedIndices: [Int] = []
+        var uniqueIndices = Set<Int>()
+        while selectedIndices.count < wordCount {
             let index = try randomIndex(max: dictionarySize)
-            result.append(words[index])
+            if uniqueIndices.insert(index).inserted {
+                selectedIndices.append(index)
+            }
         }
-        return result
+        return selectedIndices.map { words[$0] }
     }
     
     func normalize(_ words: [String]) -> String {
