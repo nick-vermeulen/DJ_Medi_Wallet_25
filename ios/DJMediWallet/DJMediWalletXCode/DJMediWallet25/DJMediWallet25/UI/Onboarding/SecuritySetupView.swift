@@ -74,10 +74,10 @@ struct SecuritySetupView: View {
             biometricsAvailable = lockManager.canUseBiometrics()
             allowBiometrics = biometricsAvailable
         }
-        .onChange(of: passcode) { newValue in
+        .onChange(of: passcode) { _, newValue in
             passcode = sanitized(newValue)
         }
-        .onChange(of: confirmPasscode) { newValue in
+        .onChange(of: confirmPasscode) { _, newValue in
             confirmPasscode = sanitized(newValue)
         }
         .toolbar {

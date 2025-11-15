@@ -466,7 +466,7 @@ private struct PassphraseConfirmStep: View {
             .padding(.vertical, 16)
             .background(.ultraThinMaterial)
         }
-        .onChange(of: indices) { _ in
+        .onChange(of: indices) { _, _ in
             inputs.removeAll()
         }
         .onAppear {

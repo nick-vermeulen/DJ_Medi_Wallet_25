@@ -31,22 +31,15 @@ actor SupabaseService {
 
     static let shared = SupabaseService()
 
-    private let client: SupabaseClient?
-    private let decoder: JSONDecoder
+    private var client: SupabaseClient?
+    private let urlSession: URLSession
     private let maxRetryAttempts = 3
     private let initialRetryDelay: UInt64 = 500_000_000 // 0.5s
     private let maximumRetryDelay: UInt64 = 4_000_000_000 // 4s
 
     private init() {
-        if let config = SupabaseConfig.loadDefault() {
-            self.client = SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
-        } else {
-            self.client = nil
-        }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        self.decoder = decoder
+        self.client = nil
+        self.urlSession = URLSession(configuration: .default)
     }
 
     var isConfigured: Bool {
@@ -54,7 +47,7 @@ actor SupabaseService {
     }
 
     func currentUserId() async throws -> UUID {
-        let client = try requireClient()
+        let client = try await requireClient()
         do {
             let session = try await client.auth.session
             return session.user.id
@@ -64,8 +57,8 @@ actor SupabaseService {
     }
 
     func fetchPatientRecords(for patientId: UUID) async throws -> [MedicalCredential] {
-        let client = try requireClient()
-        return try await performWithRetry { [self] in
+        let client = try await requireClient()
+        return try await performWithRetry {
             let response = try await client
                 .from("health_records")
                 .select()
@@ -74,7 +67,7 @@ actor SupabaseService {
                 .execute()
             let data = response.data
             guard data.isEmpty == false else { return [] }
-            let payload = try self.decoder.decode([SupabaseHealthRecord].self, from: data)
+            let payload = try SupabaseService.makeDecoder().decode([SupabaseHealthRecord].self, from: data)
             return await MainActor.run {
                 payload.map { $0.toCredential() }
             }
@@ -82,11 +75,12 @@ actor SupabaseService {
     }
 
     func authStateChangeStream() async throws -> AsyncStream<(event: AuthChangeEvent, session: Session?)> {
-        let client = try requireClient()
+        let client = try await requireClient()
         return client.auth.authStateChanges
     }
 
-    private func requireClient() throws -> SupabaseClient {
+    private func requireClient() async throws -> SupabaseClient {
+        await prepareClientIfNeeded()
         guard let client else {
             throw ServiceError.misconfigured
         }
@@ -137,6 +131,77 @@ actor SupabaseService {
             return serviceError
         }
         return ServiceError.requestFailed(error.localizedDescription)
+    }
+
+    func submitPresentationResponse(
+        _ response: SDJWTPresentationResponse,
+        to endpoint: URL
+    ) async throws -> PresentationSubmissionReceipt {
+        let encodedResponse = try await SupabaseService.encodeResponseForTransmission(response)
+        var urlRequest = URLRequest(url: endpoint)
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = encodedResponse
+
+        let (data, rawResponse): (Data, URLResponse)
+        do {
+            (data, rawResponse) = try await urlSession.data(for: urlRequest)
+        } catch {
+            throw map(error)
+        }
+
+        guard let httpResponse = rawResponse as? HTTPURLResponse else {
+            throw ServiceError.requestFailed("Verifier returned an invalid response.")
+        }
+
+        guard (200 ..< 300).contains(httpResponse.statusCode) else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw ServiceError.requestFailed("Verifier rejected presentation (status \(httpResponse.statusCode)): \(body)")
+        }
+
+        if data.isEmpty {
+            return PresentationSubmissionReceipt(submissionId: nil, status: "submitted", receivedAt: Date())
+        }
+
+        do {
+            return try await SupabaseService.decodeSubmissionReceipt(from: data)
+        } catch {
+            return PresentationSubmissionReceipt(submissionId: nil, status: "submitted", receivedAt: Date())
+        }
+    }
+
+    private func prepareClientIfNeeded() async {
+        guard client == nil else { return }
+        guard let config = await MainActor.run(body: { SupabaseConfig.loadDefault() }) else {
+            return
+        }
+        client = SupabaseClient(supabaseURL: config.url, supabaseKey: config.anonKey)
+    }
+
+    private static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        return decoder
+    }
+
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        return encoder
+    }
+
+    private static func encodeResponseForTransmission(_ response: SDJWTPresentationResponse) async throws -> Data {
+        try await MainActor.run {
+            try SupabaseService.makeEncoder().encode(response)
+        }
+    }
+
+    private static func decodeSubmissionReceipt(from data: Data) async throws -> PresentationSubmissionReceipt {
+        try await MainActor.run {
+            try SupabaseService.makeDecoder().decode(PresentationSubmissionReceipt.self, from: data)
+        }
     }
 }
 

@@ -117,23 +117,24 @@ final class AppLockManager: ObservableObject {
     
     init(
         walletManager: WalletManager? = nil,
-        keychain: KeychainService = KeychainService(),
-        defaults: UserDefaults = .standard
+        keychain: KeychainService? = nil,
+        defaults: UserDefaults? = nil
     ) {
+        let resolvedDefaults = defaults ?? .standard
         self.walletManager = walletManager ?? WalletManager.shared
-        self.keychain = keychain
-        self.defaults = defaults
-        self.userProfile = AppLockManager.decodeLegacyProfile(from: defaults)
-        if defaults.bool(forKey: onboardingKey) {
+        self.keychain = keychain ?? KeychainService()
+        self.defaults = resolvedDefaults
+        self.userProfile = AppLockManager.decodeLegacyProfile(from: resolvedDefaults)
+        if resolvedDefaults.bool(forKey: onboardingKey) {
             self.lockState = .locked
         } else {
             self.lockState = .onboarding
         }
-        if let storedTimeout = defaults.object(forKey: lockTimeoutKey) as? Double {
+        if let storedTimeout = resolvedDefaults.object(forKey: lockTimeoutKey) as? Double {
             self.lockTimeout = storedTimeout
         } else {
             self.lockTimeout = 60
-            defaults.set(60, forKey: lockTimeoutKey)
+            resolvedDefaults.set(60, forKey: lockTimeoutKey)
         }
         Task { [weak self] in
             guard let self else { return }
@@ -407,8 +408,7 @@ final class AppLockManager: ObservableObject {
             do {
                 let stream = try await SupabaseService.shared.authStateChangeStream()
                 for await change in stream {
-                    guard let manager = await MainActor.run(body: { self }) else { return }
-                    await manager.processSupabaseAuthEvent(event: change.event, session: change.session)
+                    await self?.processSupabaseAuthEvent(event: change.event, session: change.session)
                 }
             } catch {
                 // Ignore configuration errors until Supabase is available.

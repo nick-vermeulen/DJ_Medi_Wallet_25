@@ -20,6 +20,13 @@ struct ContentView: View {
                     Label("Records", systemImage: "folder.fill")
                 }
             
+            PresentationHubView()
+                .environmentObject(walletManager)
+                .environmentObject(lockManager)
+                .tabItem {
+                    Label("Present", systemImage: "person.wave.2")
+                }
+
             SettingsView()
                 .environmentObject(lockManager)
                 .tabItem {

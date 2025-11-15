@@ -79,7 +79,7 @@ struct UnlockView: View {
             isPasscodeFieldFocused = true
             attemptBiometricOnce()
         }
-        .onChange(of: passcode) { newValue in
+        .onChange(of: passcode) { _, newValue in
             passcode = String(newValue.filter { $0.isNumber }.prefix(6))
         }
         .sheet(isPresented: $isPassphraseSheetPresented) {

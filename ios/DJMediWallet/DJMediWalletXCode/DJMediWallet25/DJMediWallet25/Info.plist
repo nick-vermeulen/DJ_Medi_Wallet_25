@@ -6,6 +6,8 @@
 	<string>JEbwLuq30jtct/3yta2yKN4n9bAxOAC3vzQ8PKLI/feNN93syWLw8u/Nrg7XB83dQylNIZr4kpIATXK0vIMnYg==</string>
 	<key>SupabaseURL</key>
 	<string>https://mpaxzasbhhfigidorgle.supabase.co</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Allow DJ Medi Wallet to scan verification QR codes from healthcare providers.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

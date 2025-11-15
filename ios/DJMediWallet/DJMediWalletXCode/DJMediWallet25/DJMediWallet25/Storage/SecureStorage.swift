@@ -1,6 +1,9 @@
 //
 //  SecureStorage.swift
 //  DJMediWallet
+    
+    // MARK: - MainActor Bridging
+    
 //
 //  Secure storage for medical credentials
 //
@@ -64,10 +67,12 @@ public class SecureStorage {
     public func storeCredential(_ credential: MedicalCredential, completion: @escaping (Result<String, WalletError>) -> Void) {
         DispatchQueue.global(qos: .userInitiated).async {
             do {
-                // Serialize credential to JSON
-                let encoder = JSONEncoder()
-                encoder.dateEncodingStrategy = .iso8601
-                let data = try encoder.encode(credential)
+                // Serialize credential to JSON on the MainActor because MedicalCredential's Codable conformance is main-actor isolated.
+                let data = try self.performOnMainActorSync {
+                    let encoder = JSONEncoder()
+                    encoder.dateEncodingStrategy = .iso8601
+                    return try encoder.encode(credential)
+                }
                 
                 // Store in encrypted format
                 let encrypted = try self.encrypt(data)
@@ -135,9 +140,11 @@ public class SecureStorage {
         let data = try decrypt(encrypted)
         
         // Deserialize
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(MedicalCredential.self, from: data)
+        return try performOnMainActorSync {
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            return try decoder.decode(MedicalCredential.self, from: data)
+        }
     }
     
     /// Delete a credential
@@ -214,6 +221,19 @@ public class SecureStorage {
         return files
             .filter { $0.pathExtension == "enc" }
             .map { $0.deletingPathExtension().lastPathComponent }
+    }
+
+    @inline(__always)
+    private func performOnMainActorSync<T>(_ operation: @MainActor () throws -> T) throws -> T {
+        if Thread.isMainThread {
+            return try operation()
+        }
+
+        var result: Result<T, Error>!
+        DispatchQueue.main.sync {
+            result = Result { try MainActor.assumeIsolated(operation) }
+        }
+        return try result.get()
     }
 
     // MARK: - Metadata

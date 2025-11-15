@@ -309,6 +309,49 @@ public class SecurityManager {
             }
         }
     }
+
+    /// Sign an SD-JWT selective disclosure payload with the device key pair.
+    func signSelectiveDisclosure(payload: SDJWTPresentationPayload) async throws -> SDJWTPresentationSignature {
+        try await withCheckedThrowingContinuation { continuation in
+            signSelectiveDisclosure(payload: payload) { result in
+                continuation.resume(with: result)
+            }
+        }
+    }
+
+    private func signSelectiveDisclosure(
+        payload: SDJWTPresentationPayload,
+        completion: @escaping (Result<SDJWTPresentationSignature, WalletError>) -> Void
+    ) {
+        guard let privateKey = retrievePrivateKey() else {
+            completion(.failure(.authenticationFailed))
+            return
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let encoder = JSONEncoder()
+                encoder.dateEncodingStrategy = .iso8601
+                let payloadData = try encoder.encode(payload)
+                let signature = try privateKey.signature(for: payloadData)
+                let envelope = SDJWTPresentationSignature(
+                    payload: payload,
+                    encodedPayload: payloadData.base64URLEncodedString(),
+                    signature: signature.rawRepresentation.base64URLEncodedString(),
+                    publicKey: privateKey.publicKey.rawRepresentation.base64URLEncodedString(),
+                    algorithm: "ES256"
+                )
+
+                DispatchQueue.main.async {
+                    completion(.success(envelope))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(.signingFailed(error)))
+                }
+            }
+        }
+    }
     
     /// Verify presentation signature
     public func verifyPresentation(_ presentation: CredentialPresentation) -> Bool {

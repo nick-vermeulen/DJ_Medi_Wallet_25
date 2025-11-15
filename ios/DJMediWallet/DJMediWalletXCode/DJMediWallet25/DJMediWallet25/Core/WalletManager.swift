@@ -323,6 +323,68 @@ public class WalletManager: ObservableObject {
             }
         }
     }
+
+    /// Prepare an SD-JWT presentation response for the supplied request and disclosures.
+    /// - Parameters:
+    ///   - request: The verifier request to satisfy.
+    ///   - selections: The set of credential claims the user consents to disclose.
+    /// - Returns: A signed SD-JWT payload ready for transport to the verifier callback endpoint.
+    func preparePresentationResponse(
+        for request: SDJWTPresentationRequest,
+        selections: [SDJWTClaimSelection]
+    ) async throws -> SDJWTPresentationResponse {
+        guard isWalletInitialized() else {
+            throw WalletError.notInitialized
+        }
+
+        guard selections.isEmpty == false else {
+            throw WalletError.disclosureValidationFailed("No data selected for disclosure.")
+        }
+
+        var seenClaimIdentifiers = Set<String>()
+        var disclosedClaims: [SDJWTDisclosedClaim] = []
+
+        for selection in selections {
+            guard seenClaimIdentifiers.insert(selection.claim.id).inserted else {
+                throw WalletError.disclosureValidationFailed("Duplicate disclosure detected for claim \(selection.claim.displayName).")
+            }
+
+            guard let value = selection.credential.value(forClaimPath: selection.claim.claimPath) else {
+                throw WalletError.disclosureValidationFailed("Missing value for \(selection.claim.displayName).")
+            }
+
+            let disclosed = SDJWTDisclosedClaim(claim: selection.claim, credential: selection.credential, value: value)
+            disclosedClaims.append(disclosed)
+        }
+
+        guard disclosedClaims.isEmpty == false else {
+            throw WalletError.disclosureValidationFailed("No credential data available for this request.")
+        }
+
+        let issuedAt = Date()
+        let payload = SDJWTPresentationPayload(
+            requestId: request.id.uuidString,
+            audience: request.metadata.audience,
+            nonce: request.metadata.nonce,
+            issuedAt: issuedAt,
+            expiresAt: request.metadata.expiry,
+            disclosures: disclosedClaims
+        )
+
+        let signatureEnvelope = try await securityManager.signSelectiveDisclosure(payload: payload)
+
+        return SDJWTPresentationResponse(
+            requestId: request.id.uuidString,
+            payload: signatureEnvelope.encodedPayload,
+            signature: signatureEnvelope.signature,
+            publicKey: signatureEnvelope.publicKey,
+            algorithm: signatureEnvelope.algorithm,
+            disclosedClaims: disclosedClaims,
+            audience: request.metadata.audience,
+            nonce: request.metadata.nonce,
+            issuedAt: issuedAt
+        )
+    }
     
     // MARK: - Security
     
@@ -345,6 +407,7 @@ public enum WalletError: Error {
     case deletionFailed(Error)
     case signingFailed(Error)
     case authenticationFailed
+    case disclosureValidationFailed(String)
     case unknown(Error)
     
     public var localizedDescription: String {
@@ -365,6 +428,8 @@ public enum WalletError: Error {
             return "Signing operation failed: \(error.localizedDescription)"
         case .authenticationFailed:
             return "User authentication failed"
+        case .disclosureValidationFailed(let reason):
+            return "Disclosure validation failed: \(reason)"
         case .unknown(let error):
             return "Unknown error: \(error.localizedDescription)"
         }
