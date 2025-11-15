@@ -247,6 +247,21 @@ public class WalletManager: ObservableObject {
         }
     }
 
+    public func removeAllCredentials() async throws {
+        try await initializeWalletIfNeeded()
+        let existing = try await getAllCredentialsAsync()
+        for credential in existing {
+            try await deleteCredentialAsync(id: credential.id)
+        }
+    }
+
+    public func importCredentials(_ credentials: [MedicalCredential]) async throws {
+        try await initializeWalletIfNeeded()
+        for credential in credentials {
+            try await storeCredentialAsync(credential)
+        }
+    }
+
     // MARK: - Metadata
     
     public func storeMetadata<T: Codable>(_ value: T, forKey key: String, completion: @escaping (Result<Void, WalletError>) -> Void) {

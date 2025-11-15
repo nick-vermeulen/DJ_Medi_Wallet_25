@@ -26,8 +26,8 @@ struct AppRootView: View {
                 ContentView()
             }
         }
-        .onChange(of: scenePhase) { phase in
-            switch phase {
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
             case .active:
                 lockManager.cancelAutoLock()
             case .inactive, .background:

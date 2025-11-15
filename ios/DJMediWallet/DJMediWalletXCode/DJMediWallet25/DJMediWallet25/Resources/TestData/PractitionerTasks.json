@@ -1,0 +1,173 @@
+[
+  {
+    "id": "credential-task-oncology-review",
+    "type": "TaskCredential",
+    "issuer": "Springfield Oncology Ward",
+    "issuanceDate": "2025-11-15T07:45:00Z",
+    "expirationDate": null,
+    "fhirResource": {
+      "resourceType": "Task",
+      "id": "task-oncology-review",
+      "status": "requested",
+      "intent": "order",
+      "priority": "urgent",
+      "authoredOn": "2025-11-15T07:45:00Z",
+      "description": "Patient reports feeling unwell. Temperature 38.2°C. Chills and fatigue after chemotherapy 4 days ago.",
+      "for": {
+        "display": "Mrs. Thompson (NHS 345-678-901)"
+      },
+      "location": {
+        "display": "Oncology Ward, Bed 8"
+      },
+      "requester": {
+        "display": "Nurse Sarah Williams"
+      },
+      "note": [
+        {
+          "text": "Obs: BP 125/75, HR 102, SpO2 98%, Temp 38.2°C"
+        },
+        {
+          "text": "Patient appears flushed"
+        }
+      ]
+    }
+  },
+  {
+    "id": "credential-task-chest-pain",
+    "type": "TaskCredential",
+    "issuer": "Cardiology Acute Response",
+    "issuanceDate": "2025-11-14T22:15:00Z",
+    "expirationDate": null,
+    "fhirResource": {
+      "resourceType": "Task",
+      "id": "task-chest-pain",
+      "status": "requested",
+      "intent": "order",
+      "priority": "stat",
+      "authoredOn": "2025-11-14T22:15:00Z",
+      "description": "68M with new-onset chest pain radiating to left arm for 30 mins. Needs urgent review.",
+      "for": {
+        "display": "John Smith (NHS 123-456-789)"
+      },
+      "location": {
+        "display": "Ward 4, Bed 12"
+      },
+      "requester": {
+        "display": "Nurse Emma Chen"
+      },
+      "note": [
+        {
+          "text": "PMH: HTN, heart failure, smoker"
+        },
+        {
+          "text": "Obs: BP 155/90, HR 95, SpO2 97%"
+        },
+        {
+          "text": "Patient anxious and diaphoretic"
+        }
+      ]
+    }
+  },
+  {
+    "id": "credential-task-pain-review",
+    "type": "TaskCredential",
+    "issuer": "Surgical Recovery Team",
+    "issuanceDate": "2025-11-13T11:20:00Z",
+    "expirationDate": null,
+    "fhirResource": {
+      "resourceType": "Task",
+      "id": "task-pain-review",
+      "status": "requested",
+      "intent": "order",
+      "priority": "routine",
+      "authoredOn": "2025-11-13T11:20:00Z",
+      "description": "Post-op day 3 appendectomy with pain 7/10. Review analgesia effectiveness.",
+      "for": {
+        "display": "Tom Brown (NHS 567-890-123)"
+      },
+      "location": {
+        "display": "Surgical Ward, Bed 12"
+      },
+      "requester": {
+        "display": "Nurse Sarah Williams"
+      },
+      "note": [
+        {
+          "text": "Current meds: Paracetamol 1g QDS, Codeine 30mg PRN"
+        },
+        {
+          "text": "Last analgesia 4 hours ago"
+        },
+        {
+          "text": "Wound appears clean with no infection"
+        }
+      ]
+    }
+  },
+  {
+    "id": "credential-task-fall-review",
+    "type": "TaskCredential",
+    "issuer": "Cardiology Ward",
+    "issuanceDate": "2025-11-12T19:05:00Z",
+    "expirationDate": null,
+    "fhirResource": {
+      "resourceType": "Task",
+      "id": "task-fall-review",
+      "status": "requested",
+      "intent": "plan",
+      "priority": "routine",
+      "authoredOn": "2025-11-12T19:05:00Z",
+      "description": "Patient slipped in bathroom, hit head on sink. No visible injury but requires assessment.",
+      "for": {
+        "display": "Mr. Brown (NHS 234-567-890)"
+      },
+      "location": {
+        "display": "Cardiology Ward, Bed 5"
+      },
+      "requester": {
+        "display": "Nurse Emma Chen"
+      },
+      "note": [
+        {
+          "text": "Obs: BP 145/85, HR 88, SpO2 96%"
+        },
+        {
+          "text": "Patient wants to return to bed"
+        }
+      ]
+    }
+  },
+  {
+    "id": "credential-task-discharge",
+    "type": "TaskCredential",
+    "issuer": "Discharge Coordination Team",
+    "issuanceDate": "2025-11-12T08:30:00Z",
+    "expirationDate": null,
+    "fhirResource": {
+      "resourceType": "Task",
+      "id": "task-discharge-planning",
+      "status": "requested",
+      "intent": "plan",
+      "priority": "asap",
+      "authoredOn": "2025-11-12T08:30:00Z",
+      "description": "Patient ready for discharge. Confirm home care package and complete discharge summary.",
+      "for": {
+        "display": "Mary Johnson (NHS 456-789-012)"
+      },
+      "location": {
+        "display": "Ward 6, Bed 3"
+      },
+      "requester": {
+        "display": "Care Coordinator John Davis"
+      },
+      "note": [
+        {
+          "text": "Awaiting social services confirmation"
+        },
+        {
+          "text": "Family arriving this afternoon"
+        }
+      ]
+    }
+  }
+]

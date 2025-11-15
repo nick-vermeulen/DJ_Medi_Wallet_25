@@ -139,7 +139,9 @@ public class SecurityManager {
         }
 
         if config.userAuthenticationRequired {
-            query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+            let context = LAContext()
+            context.interactionNotAllowed = true
+            query[kSecUseAuthenticationContext as String] = context
         }
 
         let status = SecItemCopyMatching(query as CFDictionary, nil)
@@ -328,25 +330,30 @@ public class SecurityManager {
             return
         }
 
-        DispatchQueue.global(qos: .userInitiated).async {
+        Task.detached(priority: .userInitiated) {
             do {
-                let encoder = JSONEncoder()
-                encoder.dateEncodingStrategy = .iso8601
-                let payloadData = try encoder.encode(payload)
-                let signature = try privateKey.signature(for: payloadData)
-                let envelope = SDJWTPresentationSignature(
-                    payload: payload,
-                    encodedPayload: payloadData.base64URLEncodedString(),
-                    signature: signature.rawRepresentation.base64URLEncodedString(),
-                    publicKey: privateKey.publicKey.rawRepresentation.base64URLEncodedString(),
-                    algorithm: "ES256"
-                )
+                let payloadData = try await MainActor.run { () -> Data in
+                    let encoder = JSONEncoder()
+                    encoder.dateEncodingStrategy = .iso8601
+                    return try encoder.encode(payload)
+                }
 
-                DispatchQueue.main.async {
+                let signature = try privateKey.signature(for: payloadData)
+                let envelope = await MainActor.run { () -> SDJWTPresentationSignature in
+                    SDJWTPresentationSignature(
+                        payload: payload,
+                        encodedPayload: payloadData.base64URLEncodedString(),
+                        signature: signature.rawRepresentation.base64URLEncodedString(),
+                        publicKey: privateKey.publicKey.rawRepresentation.base64URLEncodedString(),
+                        algorithm: "ES256"
+                    )
+                }
+
+                await MainActor.run {
                     completion(.success(envelope))
                 }
             } catch {
-                DispatchQueue.main.async {
+                await MainActor.run {
                     completion(.failure(.signingFailed(error)))
                 }
             }

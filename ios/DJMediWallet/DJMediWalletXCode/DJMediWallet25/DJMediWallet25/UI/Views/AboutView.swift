@@ -1,6 +1,13 @@
 import SwiftUI
+import UIKit
 
 struct AboutView: View {
+    @EnvironmentObject private var walletManager: WalletManager
+    @EnvironmentObject private var lockManager: AppLockManager
+    @State private var tapHistory: [Date] = []
+    @State private var isSeedingFixtures = false
+    @State private var fixtureStatus: FixtureStatus?
+
     private let sections: [AboutSection] = [
         AboutSection(
             title: "Our Mission",
@@ -32,6 +39,8 @@ struct AboutView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, 24)
                     .accessibilityHidden(true)
+                    .contentShape(Rectangle())
+                    .onTapGesture { handleSecretTap() }
                 Text("About DJ Medi Wallet")
                     .font(.largeTitle)
                     .fontWeight(.bold)
@@ -52,6 +61,69 @@ struct AboutView: View {
         }
         .navigationTitle("About")
         .navigationBarTitleDisplayMode(.inline)
+        .overlay {
+            if isSeedingFixtures {
+                ProgressView("Loading demo data…")
+                    .progressViewStyle(.circular)
+                    .padding()
+                    .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .alert(item: $fixtureStatus) { status in
+            Alert(
+                title: Text(status.kind == .success ? "Demo Data Ready" : "Demo Load Failed"),
+                message: Text(status.message),
+                dismissButton: .default(Text("OK"))
+            )
+        }
+    }
+
+    private func handleSecretTap() {
+        let now = Date()
+        tapHistory = tapHistory.filter { now.timeIntervalSince($0) < 1.2 }
+        tapHistory.append(now)
+
+        guard tapHistory.count >= 5 else { return }
+        tapHistory.removeAll()
+
+        guard lockManager.userProfile != nil else {
+            fixtureStatus = FixtureStatus(kind: .failure, message: "Create your profile before loading demo data.")
+            return
+        }
+
+        guard isSeedingFixtures == false else { return }
+
+        isSeedingFixtures = true
+        Task {
+            await seedFixtures()
+        }
+    }
+
+    private func seedFixtures() async {
+        guard let profile = lockManager.userProfile else {
+            await MainActor.run {
+                fixtureStatus = FixtureStatus(kind: .failure, message: "Profile is required before loading demo data.")
+                isSeedingFixtures = false
+            }
+            return
+        }
+
+        do {
+            try await TestDataManager.shared.seedFixtures(for: profile.role)
+            await MainActor.run {
+                let feedback = UINotificationFeedbackGenerator()
+                feedback.notificationOccurred(.success)
+                fixtureStatus = FixtureStatus(kind: .success, message: "Loaded demo records for \(profile.role.displayName). Pull to refresh to see them.")
+                isSeedingFixtures = false
+            }
+        } catch {
+            await MainActor.run {
+                let feedback = UINotificationFeedbackGenerator()
+                feedback.notificationOccurred(.error)
+                fixtureStatus = FixtureStatus(kind: .failure, message: error.localizedDescription)
+                isSeedingFixtures = false
+            }
+        }
     }
 }
 
@@ -59,6 +131,17 @@ private struct AboutSection: Identifiable {
     let id = UUID()
     let title: String
     let body: String
+}
+
+private struct FixtureStatus: Identifiable {
+    enum Kind {
+        case success
+        case failure
+    }
+
+    let id = UUID()
+    let kind: Kind
+    let message: String
 }
 
 #Preview {

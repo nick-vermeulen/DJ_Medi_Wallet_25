@@ -56,8 +56,8 @@ struct CaptureTaskFormView: View {
                     .keyboardType(.numberPad)
                     .textInputAutocapitalization(.never)
                     .focused($focusedField, equals: .nhs)
-                    .onChange(of: draft.nhsNumber) { _ in
-                        draft.nhsNumber = draft.nhsNumber.filter { $0.isNumber }.prefix(10).map(String.init).joined()
+                    .onChange(of: draft.nhsNumber) { _, newValue in
+                        draft.nhsNumber = newValue.filter { $0.isNumber }.prefix(10).map(String.init).joined()
                     }
                     .overlay(alignment: .trailing) {
                         if draft.nhsNumber.count == 10 {

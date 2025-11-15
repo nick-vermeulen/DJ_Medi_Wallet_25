@@ -345,6 +345,7 @@ final class AppLockManager: ObservableObject {
         guard !trimmedFirst.isEmpty, !trimmedLast.isEmpty else {
             throw SetupError.profileIncomplete
         }
+        let previousRole = userProfile?.role
         let consentDate = profile.consentTimestamp
         var cleanedProfile = UserProfile(firstName: trimmedFirst, lastName: trimmedLast, role: profile.role, consentTimestamp: consentDate, externalUserId: profile.externalUserId)
 
@@ -357,6 +358,7 @@ final class AppLockManager: ObservableObject {
             try await storeProfileMetadata(cleanedProfile)
             persistProfileToDefaults(cleanedProfile)
             userProfile = cleanedProfile
+            await TestDataManager.shared.handleProfileChange(from: previousRole, to: cleanedProfile.role)
             return cleanedProfile
         } catch let error as WalletError {
             throw SetupError.storageFailure(error.localizedDescription)

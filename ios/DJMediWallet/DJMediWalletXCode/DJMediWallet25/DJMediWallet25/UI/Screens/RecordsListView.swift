@@ -125,10 +125,19 @@ struct RecordsListView: View {
         do {
             try await walletManager.initializeWalletIfNeeded()
 
+            let profile = lockManager.userProfile
+            let fixturesActive: Bool
+            if let role = profile?.role {
+                fixturesActive = await TestDataManager.shared.isFixtureSetActive(for: role)
+            } else {
+                fixturesActive = false
+            }
+
             var fetchedCredentials: [MedicalCredential] = []
             var alreadyLoaded = false
 
-            if let profile = lockManager.userProfile,
+            if let profile,
+               fixturesActive == false,
                let idString = profile.externalUserId,
                let patientId = UUID(uuidString: idString) {
                 do {
@@ -157,6 +166,9 @@ struct RecordsListView: View {
             }
 
             if !alreadyLoaded {
+                if fixturesActive, let role = profile?.role {
+                    await TestDataManager.shared.ensureFixturesAvailableIfNeeded(for: role)
+                }
                 // If we didn't already populate credentials from Supabase, ensure local cache is loaded.
                 fetchedCredentials = try await walletManager.getAllCredentialsAsync()
             }
@@ -304,6 +316,8 @@ struct RecordItem: Identifiable {
             self.iconName = "cross.case.fill"
         } else if credential.type.contains("Medication") {
             self.iconName = "pills.fill"
+        } else if credential.type.contains("Task") {
+            self.iconName = "stethoscope"
         } else {
             self.iconName = "doc.fill"
         }
@@ -398,6 +412,22 @@ struct RecordItem: Identifiable {
                     self.description = "Unknown dosage"
                 }
                 
+            case "Task":
+                self.type = "Task Request"
+                if let summary = data["description"] as? String, summary.isEmpty == false {
+                    self.title = summary
+                } else {
+                    self.title = credential.type
+                }
+
+                if let patient = (data["for"] as? [String: Any])?["display"] as? String, patient.isEmpty == false {
+                    self.description = patient
+                } else if let location = (data["location"] as? [String: Any])?["display"] as? String, location.isEmpty == false {
+                    self.description = location
+                } else {
+                    self.description = credential.issuer
+                }
+
             default:
                 self.type = credential.type
                 self.title = credential.type
