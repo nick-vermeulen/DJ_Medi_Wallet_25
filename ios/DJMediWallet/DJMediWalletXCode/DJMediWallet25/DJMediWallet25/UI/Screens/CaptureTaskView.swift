@@ -15,6 +15,8 @@ struct CaptureTaskView: View {
     @State private var isSubmitting = false
     @State private var submissionAlert: SubmissionAlert?
     @State private var toastMessage: ToastMessage?
+    @State private var segmentAccumulator = QRSegmentAccumulator()
+    @State private var scanProgress: QRSegmentAccumulator.Progress?
 
     private static let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "DJMediWallet25", category: "CaptureTask")
     private static let toastDisplayDuration: UInt64 = 1_400_000_000
@@ -83,6 +85,58 @@ struct CaptureTaskView: View {
         let highlights: [Highlight]
     }
 
+    private struct ScannerInstructionOverlay: View {
+        let progress: QRSegmentAccumulator.Progress?
+
+        private var title: String {
+            guard let progress else {
+                return "Scan the patient's QR package"
+            }
+
+            if progress.isDuplicate {
+                return "Segment \(progress.latestIndex) already captured"
+            }
+
+            return "Captured \(progress.collectedCount) of \(progress.totalCount) segments"
+        }
+
+        private var subtitle: String {
+            guard let progress else {
+                return "If the wallet shows multiple tiles, capture each one in order until this view closes."
+            }
+
+            if progress.isDuplicate {
+                if let next = progress.nextExpectedIndex {
+                    return "Look for segment \(next) next and keep scanning."
+                }
+                return "All parts are recorded—hold steady until the wallet confirms."
+            }
+
+            if let next = progress.nextExpectedIndex {
+                return "Move on to segment \(next) when it appears."
+            }
+
+            return "Almost there—hold steady until the wallet confirms."
+        }
+
+        var body: some View {
+            VStack(spacing: 14) {
+                Text(title)
+                    .font(.headline)
+                    .multilineTextAlignment(.center)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.white.opacity(0.85))
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 18))
+            .foregroundColor(.white)
+            .allowsHitTesting(false)
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -103,17 +157,33 @@ struct CaptureTaskView: View {
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $isPresentingScanner) {
             NavigationStack {
-                QRScannerView { result in
-                    handleScanResult(result)
+                ZStack {
+                    QRScannerView { result in
+                        handleScanResult(result)
+                    }
+                    .ignoresSafeArea()
+
+                    VStack {
+                        ScannerInstructionOverlay(progress: scanProgress)
+                            .padding(.top, 40)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 20)
+                    .allowsHitTesting(false)
+                    .ignoresSafeArea(edges: .bottom)
                 }
-                .ignoresSafeArea()
                 .toolbar {
                     ToolbarItem(placement: .cancellationAction) {
                         Button("Cancel") {
+                            segmentAccumulator.reset()
+                            scanProgress = nil
                             isPresentingScanner = false
                         }
                     }
                 }
+                .navigationTitle("Scan Share")
+                .navigationBarTitleDisplayMode(.inline)
             }
         }
         .alert("Scan Error", isPresented: Binding(
@@ -155,7 +225,7 @@ struct CaptureTaskView: View {
             Text("Scan a QR task request")
                 .font(.title2)
                 .fontWeight(.semibold)
-            Text("Use the camera to capture the patient data or task request. The wallet will decode the payload and prepare a new task draft for you to review before submission.")
+            Text("Use the camera to capture the patient data or task request. If the patient’s wallet shows multiple QR tiles, scan each one in order—the app will assemble them and prepare a draft for review before submission.")
                 .font(.body)
                 .foregroundColor(.secondary)
         }
@@ -164,6 +234,8 @@ struct CaptureTaskView: View {
     private var captureButton: some View {
         Button {
             scanError = nil
+            scanProgress = nil
+            segmentAccumulator.reset()
             isPresentingScanner = true
         } label: {
             Label("Scan QR Code", systemImage: "qrcode.viewfinder")
@@ -171,7 +243,7 @@ struct CaptureTaskView: View {
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
-        .accessibilityHint("Launches the camera to scan a QR request")
+        .accessibilityHint("Launches the camera to scan the patient's QR package. Scan each segment in order if more than one appears.")
     }
 
     @ViewBuilder
@@ -430,24 +502,56 @@ struct CaptureTaskView: View {
         return highlights
     }
 
-    private func handleScanResult(_ result: Result<String, QRScannerError>) {
-        isPresentingScanner = false
+    private func handleScanResult(_ result: Result<String, QRScannerError>) -> QRScannerView.ScanDecision {
         switch result {
-        case .success(let payload):
-            do {
-                capturedMetadata = try parsePayload(payload)
-                if let metadata = capturedMetadata {
-                    taskDraft = CaptureTaskFormView.TaskDraft(qrMetadata: metadata)
-                }
-            } catch {
-                capturedMetadata = nil
-                taskDraft = nil
-                scanError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            }
         case .failure(let error):
+            segmentAccumulator.reset()
+            scanProgress = nil
+            isPresentingScanner = false
             capturedMetadata = nil
             taskDraft = nil
             scanError = error.errorDescription
+            return .finish
+        case .success(let payload):
+            let outcome = segmentAccumulator.ingest(payload)
+            switch outcome {
+            case .singlePayload(let body):
+                scanProgress = nil
+                isPresentingScanner = false
+                segmentAccumulator.reset()
+                processScannedPayload(body)
+                return .finish
+            case .complete(let combined):
+                scanProgress = nil
+                isPresentingScanner = false
+                segmentAccumulator.reset()
+                processScannedPayload(combined)
+                return .finish
+            case .progress(let progress):
+                scanProgress = progress
+                return .continueScanning
+            case .invalid(let message):
+                scanProgress = nil
+                isPresentingScanner = false
+                segmentAccumulator.reset()
+                capturedMetadata = nil
+                taskDraft = nil
+                scanError = message
+                return .finish
+            }
+        }
+    }
+
+    private func processScannedPayload(_ payload: String) {
+        do {
+            capturedMetadata = try parsePayload(payload)
+            if let metadata = capturedMetadata {
+                taskDraft = CaptureTaskFormView.TaskDraft(qrMetadata: metadata)
+            }
+        } catch {
+            capturedMetadata = nil
+            taskDraft = nil
+            scanError = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
         }
     }
 

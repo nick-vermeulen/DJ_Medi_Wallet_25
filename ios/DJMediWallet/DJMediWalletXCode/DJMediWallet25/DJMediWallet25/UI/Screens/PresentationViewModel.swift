@@ -15,7 +15,6 @@ final class PresentationViewModel: ObservableObject {
         case loading
         case ready
         case submitting
-        case submitted(PresentationSubmissionReceipt)
         case error(String)
     }
 
@@ -30,14 +29,21 @@ final class PresentationViewModel: ObservableObject {
     @Published var claims: [PresentationDisclosureClaim] = []
     @Published var isScannerPresented = false
     @Published var alert: AlertContext?
+    @Published var proximityShareState: ProximityShareState?
+    
 
     var canSubmit: Bool {
         guard case .ready = status else { return false }
         return claims.contains { $0.include }
     }
 
+    var missingRecentObservationData: Bool {
+        claims.first(where: { $0.claim.id == Self.recentObservationsClaimId })?.options.isEmpty ?? false
+    }
+
     func beginScan() {
         isScannerPresented = true
+        proximityShareState = nil
     }
 
     func cancelScan() {
@@ -49,9 +55,10 @@ final class PresentationViewModel: ObservableObject {
         request = nil
         claims = []
         alert = nil
+        proximityShareState = nil
     }
 
-    func handleScanResult(_ result: Result<String, QRScannerError>, walletManager: WalletManager) {
+    func handleScanResult(_ result: Result<String, QRScannerError>, walletManager: WalletManager) -> QRScannerView.ScanDecision {
         isScannerPresented = false
 
         switch result {
@@ -62,10 +69,13 @@ final class PresentationViewModel: ObservableObject {
                 await loadRequest(from: payload, walletManager: walletManager)
             }
         }
+
+        return .finish
     }
 
     func loadRequest(from payload: String, walletManager: WalletManager) async {
         status = .loading
+        proximityShareState = nil
 
         do {
             let presentationRequest = try await PresentationRequestResolver.resolve(from: payload)
@@ -96,14 +106,28 @@ final class PresentationViewModel: ObservableObject {
             let selections = try buildSelections()
             status = .submitting
             let response = try await walletManager.preparePresentationResponse(for: activeRequest, selections: selections)
-            let receipt = try await SupabaseService.shared.submitPresentationResponse(response, to: activeRequest.metadata.responseURI)
-            status = .submitted(receipt)
+            let encodedPayload = try PayloadEncoder.encode(response)
+            let segments = QRPayloadSegmenter.segments(for: encodedPayload)
+            let prettyJSON = try PresentationViewModel.makePrettyJSON(fromEncodedPayload: encodedPayload)
+            let summaries = makeDisclosureSummaries()
+
+            proximityShareState = ProximityShareState(
+                verifierName: activeRequest.metadata.verifierDisplayName,
+                verifierPurpose: activeRequest.metadata.purpose,
+                payloadSegments: segments,
+                encodedPayload: encodedPayload,
+                prettyJSON: prettyJSON,
+                disclosures: summaries
+            )
+            status = .ready
         } catch let walletError as WalletError {
             status = .ready
+            proximityShareState = nil
             alert = AlertContext(title: "Disclosure Error", message: walletError.localizedDescription)
         } catch {
             status = .ready
-            alert = AlertContext(title: "Submission Error", message: error.localizedDescription)
+            proximityShareState = nil
+            alert = AlertContext(title: "QR Packaging Error", message: error.localizedDescription)
         }
     }
 
@@ -115,7 +139,9 @@ final class PresentationViewModel: ObservableObject {
                 credentialMatches(claimRequest: claimRequest, credential: credential)
             }
 
-            let options = matchingCredentials.compactMap { credential -> PresentationDisclosureOption? in
+            let filteredCredentials = filter(credentials: matchingCredentials, for: claimRequest)
+
+            let options = filteredCredentials.compactMap { credential -> PresentationDisclosureOption? in
                 guard let value = credential.value(forClaimPath: claimRequest.claimPath) else { return nil }
                 return PresentationDisclosureOption(claim: claimRequest, credential: credential, value: value)
             }
@@ -166,7 +192,77 @@ final class PresentationViewModel: ObservableObject {
 
         return false
     }
+
+    private func filter(credentials: [MedicalCredential], for claimRequest: SDJWTClaimRequest) -> [MedicalCredential] {
+        guard claimRequest.id == Self.recentObservationsClaimId else { return credentials }
+        let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+        return credentials.filter { credential in
+            guard let observationDate = observationDate(for: credential) else { return false }
+            return observationDate >= cutoff
+        }
+    }
+
+    private func observationDate(for credential: MedicalCredential) -> Date? {
+        guard credential.fhirResource?.resourceType.caseInsensitiveCompare("Observation") == .orderedSame else {
+            return credential.issuanceDate
+        }
+
+        if let data = credential.fhirResource?.data {
+            if let effective = data["effectiveDateTime"] as? String, let parsed = PresentationViewModel.parseISO8601(effective) {
+                return parsed
+            }
+            if let issued = data["issued"] as? String, let parsed = PresentationViewModel.parseISO8601(issued) {
+                return parsed
+            }
+        }
+
+        return credential.issuanceDate
+    }
+
+    private func makeDisclosureSummaries() -> [ProximityShareState.DisclosureSummary] {
+        claims.compactMap { claim in
+            guard claim.include, let option = claim.selectedOption else { return nil }
+            return ProximityShareState.DisclosureSummary(
+                id: claim.id,
+                title: claim.claim.displayName,
+                detail: option.valueSummary
+            )
+        }
+    }
+
+    func clearShareState() {
+        proximityShareState = nil
+    }
+
+    private static func parseISO8601(_ string: String) -> Date? {
+        if let date = iso8601WithFractional.date(from: string) {
+            return date
+        }
+        return iso8601Plain.date(from: string)
+    }
+
+    private static func makePrettyJSON(fromEncodedPayload payload: String) throws -> String {
+        let decoded = try PayloadEncoder.decodePayload(payload)
+        let object = try JSONSerialization.jsonObject(with: decoded, options: [])
+        let pretty = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .withoutEscapingSlashes])
+        return String(decoding: pretty, as: UTF8.self)
+    }
+
+    private static let recentObservationsClaimId = "recent_observations"
+
+    private static let iso8601WithFractional: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private static let iso8601Plain: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
 }
+
 
 // MARK: - Disclosure Claim View Models
 
@@ -182,6 +278,22 @@ struct PresentationDisclosureClaim: Identifiable {
         guard let selectedOptionId else { return nil }
         return options.first { $0.id == selectedOptionId }
     }
+}
+
+struct ProximityShareState: Identifiable {
+    struct DisclosureSummary: Identifiable {
+        let id: String
+        let title: String
+        let detail: String
+    }
+
+    let id = UUID()
+    let verifierName: String
+    let verifierPurpose: String
+    let payloadSegments: [QRPayloadSegment]
+    let encodedPayload: String
+    let prettyJSON: String
+    let disclosures: [DisclosureSummary]
 }
 
 struct PresentationDisclosureOption: Identifiable {

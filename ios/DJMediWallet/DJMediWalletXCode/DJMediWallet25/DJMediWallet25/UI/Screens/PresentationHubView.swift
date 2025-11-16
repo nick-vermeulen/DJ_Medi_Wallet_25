@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+import Combine
+import UIKit
 
 struct PresentationHubView: View {
     @EnvironmentObject private var walletManager: WalletManager
@@ -26,8 +28,11 @@ struct PresentationHubView: View {
             }
             .navigationTitle("Present")
             .toolbar { toolbarContent }
-            .sheet(isPresented: $viewModel.isScannerPresented) {
+            .fullScreenCover(isPresented: $viewModel.isScannerPresented) {
                 scannerSheet
+            }
+            .sheet(item: $viewModel.proximityShareState) { state in
+                ProximityShareSheet(state: state)
             }
             .alert(item: $viewModel.alert) { alert in
                 Alert(title: Text(alert.title), message: Text(alert.message), dismissButton: .default(Text("OK")))
@@ -45,16 +50,16 @@ struct PresentationHubView: View {
             EmptyStateView(status: viewModel.status) {
                 viewModel.beginScan()
             }
-        case .ready, .submitting, .submitted:
+        case .ready, .submitting:
             if let request = viewModel.request {
                 ScrollView {
                     VStack(spacing: 16) {
                         RequestSummaryCard(request: request)
-
-                        if case .submitted(let receipt) = viewModel.status {
-                            SubmissionReceiptBanner(receipt: receipt)
+                        if viewModel.missingRecentObservationData {
+                            MissingDataBanner {
+                                viewModel.reset()
+                            }
                         }
-
                         DisclosureListView(claims: $viewModel.claims)
                     }
                     .padding(.horizontal)
@@ -62,6 +67,11 @@ struct PresentationHubView: View {
                     .padding(.bottom, 120)
                 }
                 .background(Color(.systemGroupedBackground).ignoresSafeArea())
+                .onReceive(viewModel.$claims) { _ in
+                    if viewModel.proximityShareState != nil {
+                        viewModel.clearShareState()
+                    }
+                }
             } else {
                 EmptyStateView(status: .idle) {
                     viewModel.beginScan()
@@ -91,11 +101,12 @@ struct PresentationHubView: View {
                     .padding(.bottom, 12)
                     .disabled(!viewModel.canSubmit)
 
-                    if case .submitted = viewModel.status {
-                        Button("Scan Another Request") {
+                    if viewModel.missingRecentObservationData {
+                        Button("Cancel Request", role: .cancel) {
                             viewModel.reset()
-                            viewModel.beginScan()
                         }
+                        .buttonStyle(.bordered)
+                        .padding(.horizontal)
                         .padding(.bottom, 12)
                     }
                 }
@@ -116,19 +127,13 @@ struct PresentationHubView: View {
     }
 
     private var buttonTitle: String {
-        if case .submitted = viewModel.status {
-            return "Resend Presentation"
-        }
-        return "Share Presentation"
+        return "Show QR Package"
     }
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
         ToolbarItemGroup(placement: .primaryAction) {
             Button {
-                if case .submitted = viewModel.status {
-                    viewModel.reset()
-                }
                 viewModel.beginScan()
             } label: {
                 Label("Scan", systemImage: "qrcode.viewfinder")
@@ -279,36 +284,29 @@ private struct RequestSummaryCard: View {
     }
 }
 
-private struct SubmissionReceiptBanner: View {
-    let receipt: PresentationSubmissionReceipt
+private struct MissingDataBanner: View {
+    let onCancel: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "checkmark.shield.fill")
-                .foregroundColor(.white)
-                .font(.title3)
-                .padding(10)
-                .background(Circle().fill(Color.green))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Presentation sent")
-                    .font(.headline)
-                if let receivedAt = receipt.receivedAt {
-                    Text("Verifier acknowledged at \(receivedAt, style: .time)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                if let submissionId = receipt.submissionId {
-                    Text("Submission ID: \(submissionId)")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
+        VStack(alignment: .leading, spacing: 12) {
+            Label {
+                Text("No observations recorded in the last 24 hours.")
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill")
             }
+            .font(.headline)
+            .foregroundColor(.orange)
 
-            Spacer()
+            Text("You can cancel this request and let the practitioner know that recent vitals are not available.")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+
+            Button("Cancel Request", role: .cancel, action: onCancel)
+                .buttonStyle(.bordered)
         }
         .padding()
-        .background(RoundedRectangle(cornerRadius: 16).fill(Color.green.opacity(0.15)))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16).fill(Color(.secondarySystemBackground)))
     }
 }
 
@@ -400,6 +398,176 @@ private struct PresentationDisclosureClaimView: View {
                 }
             }
         )
+    }
+}
+
+private struct ProximityShareSheet: View {
+    let state: ProximityShareState
+    @Environment(\.dismiss) private var dismiss
+    @State private var currentIndex = 0
+
+    private var currentSegment: QRPayloadSegment? {
+        guard state.payloadSegments.isEmpty == false else { return nil }
+        let clampedIndex = min(max(0, currentIndex), state.payloadSegments.count - 1)
+        return state.payloadSegments[clampedIndex]
+    }
+
+    private var qrImage: UIImage? {
+        guard let payload = currentSegment?.payload else { return nil }
+        return QRCodeRenderer.image(for: payload)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    header
+                    qrDisplay
+                    if state.payloadSegments.count > 1 {
+                        segmentControls
+                    }
+                    if state.disclosures.isEmpty == false {
+                        disclosureSummary
+                    }
+                    payloadSections
+                }
+                .padding()
+            }
+            .navigationTitle("Share via QR")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+        .onAppear {
+            currentIndex = 0
+        }
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(state.verifierName)
+                .font(.title3)
+                .bold()
+            if state.verifierPurpose.isEmpty == false {
+                Text(state.verifierPurpose)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+            }
+            Text("Ask the verifier to scan each QR code in order. The payloads stay on your device.")
+                .font(.footnote)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var qrDisplay: some View {
+        if let image = qrImage, let segment = currentSegment {
+            VStack(spacing: 12) {
+                Image(uiImage: image)
+                    .interpolation(.none)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: 280)
+                    .padding(16)
+                    .background(RoundedRectangle(cornerRadius: 20).fill(Color(.systemBackground)))
+                    .shadow(radius: 4)
+                Text("Segment \(segment.index) of \(segment.total)")
+                    .font(.subheadline)
+                    .bold()
+                Text("Hold steady and allow the verifier to capture this QR.")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+        } else {
+            ProgressView("Rendering QR…")
+                .frame(maxWidth: .infinity)
+        }
+    }
+
+    private var segmentControls: some View {
+        HStack {
+            Button {
+                currentIndex = max(currentIndex - 1, 0)
+            } label: {
+                Label("Previous", systemImage: "chevron.left")
+            }
+            .disabled(currentIndex == 0)
+
+            Spacer()
+
+            Button {
+                currentIndex = min(currentIndex + 1, state.payloadSegments.count - 1)
+            } label: {
+                Label("Next", systemImage: "chevron.right")
+            }
+            .disabled(currentIndex >= state.payloadSegments.count - 1)
+        }
+    }
+
+    private var disclosureSummary: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Included Disclosures")
+                .font(.headline)
+            ForEach(state.disclosures) { disclosure in
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(disclosure.title)
+                        .font(.subheadline)
+                        .bold()
+                    Text(disclosure.detail)
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(RoundedRectangle(cornerRadius: 12).fill(Color(.secondarySystemBackground)))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var payloadSections: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            DisclosureGroup("Current QR Payload") {
+                if let payload = currentSegment?.payload {
+                    Text(payload)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Color(.systemGray6))
+                        .cornerRadius(8)
+                } else {
+                    Text("No payload available.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                }
+            }
+
+            DisclosureGroup("Full Encoded Package") {
+                Text(state.encodedPayload)
+                    .font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+            }
+
+            DisclosureGroup("Pretty JSON") {
+                Text(state.prettyJSON)
+                    .font(.system(.footnote, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(8)
+            }
+        }
     }
 }
 

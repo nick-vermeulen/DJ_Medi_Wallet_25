@@ -10,6 +10,7 @@ import Combine
 
 struct SettingsView: View {
     @EnvironmentObject private var lockManager: AppLockManager
+    @StateObject private var idCardStore = IDCardStore()
     @State private var isResettingPassphrase = false
     @State private var presentedPassphrase: [String] = []
     @State private var passphraseError: String?
@@ -31,6 +32,7 @@ struct SettingsView: View {
             Form {
                 informationSection
                 profileSection
+                idCardSection
                 securitySection
                 biometricsSection
                 recoverySection
@@ -156,6 +158,21 @@ struct SettingsView: View {
             }
             NavigationLink(destination: FAQView()) {
                 Label("FAQ & Guides", systemImage: "questionmark.circle")
+            }
+        }
+    }
+
+    private var idCardSection: some View {
+        Section(header: Text("ID Cards"), footer: Text("Store healthcare and loyalty IDs for quick access and barcode display.")) {
+            NavigationLink {
+                IDCardsListView(store: idCardStore)
+            } label: {
+                Label("ID Card Wallet", systemImage: "wallet.pass")
+            }
+            NavigationLink {
+                IDCardSettingsView(store: idCardStore)
+            } label: {
+                Label("Manage ID Cards", systemImage: "rectangle.stack.badge.person.crop")
             }
         }
     }

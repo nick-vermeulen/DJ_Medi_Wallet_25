@@ -5,6 +5,7 @@
 For iOS development, ensure you follow these guidelines:
 Comply with Apple's Human Interface Guidelines and Data Protection standards.
 Specifically ensure that the keyboard interactions, accessibility features, and data storage practices meet Apple's requirements.
+Do not use deprecated APIs; target iOS 19+. Examples include using main rather than an UI Screen isnstance, GLCoder rather than MapKit and onChange.
 - **State & Composition**: `AppRootView` decides between onboarding, lock screen, and main `ContentView` using the `AppLockManager` environment object; `ContentView` exposes `RecordsListView` and `SettingsView` tabs only.
 - **Authentication Flow**: `AppLockManager` (MainActor) manages onboarding, passcode, biometrics, and recovery passphrase. It hashes secrets with SHA256 before storing via `KeychainService`; auto-lock timers are scheduled on scene phase changes.
 - **Passphrase Handling**: `PassphraseManager` pulls its 12-word vocabulary from `Resources/passphrase_wordlist.txt` at runtime (with a minimal fallback). Always write new recovery features against `AppLockManager.generateRecoveryPassphrase` / `.storeRecoveryPassphrase` so hashing and keychain behavior stay consistent.

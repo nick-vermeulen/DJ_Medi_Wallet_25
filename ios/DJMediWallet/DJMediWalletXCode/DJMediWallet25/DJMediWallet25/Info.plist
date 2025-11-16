@@ -8,6 +8,8 @@
 	<string>https://mpaxzasbhhfigidorgle.supabase.co</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Allow DJ Medi Wallet to scan verification QR codes from healthcare providers.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Location access lets DJ Medi Wallet tailor ID card prompts for your local healthcare system.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>remote-notification</string>

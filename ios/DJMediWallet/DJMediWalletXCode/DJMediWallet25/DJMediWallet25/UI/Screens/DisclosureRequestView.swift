@@ -31,7 +31,7 @@ struct DisclosureRequestView: View {
         .task {
             viewModel.generateRequest(profile: lockManager.userProfile)
         }
-        .onChange(of: lockManager.userProfile) { profile in
+        .onChange(of: lockManager.userProfile, initial: false) { _, profile in
             viewModel.generateRequest(profile: profile)
         }
         .alert("Unable to Create Request", isPresented: Binding(

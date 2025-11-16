@@ -23,7 +23,12 @@ enum QRScannerError: LocalizedError {
 }
 
 struct QRScannerView: UIViewControllerRepresentable {
-    typealias Completion = (Result<String, QRScannerError>) -> Void
+    enum ScanDecision {
+        case continueScanning
+        case finish
+    }
+
+    typealias Completion = (Result<String, QRScannerError>) -> ScanDecision
 
     let completion: Completion
 
@@ -41,8 +46,8 @@ struct QRScannerView: UIViewControllerRepresentable {
         private let session = AVCaptureSession()
         private var previewLayer: AVCaptureVideoPreviewLayer?
         private let metadataOutput = AVCaptureMetadataOutput()
-    private let overlayLayer = CAShapeLayer()
-    private let focusBorderLayer = CAShapeLayer()
+        private let overlayLayer = CAShapeLayer()
+        private let focusBorderLayer = CAShapeLayer()
         private let instructionBackground = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
         private let instructionLabel: UILabel = {
             let label = UILabel()
@@ -53,7 +58,7 @@ struct QRScannerView: UIViewControllerRepresentable {
             label.numberOfLines = 0
             return label
         }()
-        private var didEmitResult = false
+        private var isHandlingResult = false
 
         override func viewDidLoad() {
             super.viewDidLoad()
@@ -64,7 +69,7 @@ struct QRScannerView: UIViewControllerRepresentable {
 
         override func viewWillAppear(_ animated: Bool) {
             super.viewWillAppear(animated)
-            didEmitResult = false
+            isHandlingResult = false
             if session.isRunning == false {
                 session.startRunning()
             }
@@ -99,17 +104,17 @@ struct QRScannerView: UIViewControllerRepresentable {
             case .notDetermined:
                 AVCaptureDevice.requestAccess(for: .video) { granted in
                     DispatchQueue.main.async {
-                        granted ? self.setupSession() : self.emit(.failure(.permissionDenied))
+                        granted ? self.setupSession() : self.emitFailure(.permissionDenied)
                     }
                 }
             default:
-                emit(.failure(.permissionDenied))
+                emitFailure(.permissionDenied)
             }
         }
 
         private func setupSession() {
             guard let camera = AVCaptureDevice.default(for: .video) else {
-                emit(.failure(.configurationFailed))
+                emitFailure(.configurationFailed)
                 return
             }
 
@@ -120,12 +125,12 @@ struct QRScannerView: UIViewControllerRepresentable {
                 if session.canAddInput(input) {
                     session.addInput(input)
                 } else {
-                    emit(.failure(.configurationFailed))
+                    emitFailure(.configurationFailed)
                     session.commitConfiguration()
                     return
                 }
             } catch {
-                emit(.failure(.configurationFailed))
+                emitFailure(.configurationFailed)
                 session.commitConfiguration()
                 return
             }
@@ -135,7 +140,7 @@ struct QRScannerView: UIViewControllerRepresentable {
                 metadataOutput.setMetadataObjectsDelegate(self, queue: DispatchQueue.main)
                 metadataOutput.metadataObjectTypes = [.qr]
             } else {
-                emit(.failure(.configurationFailed))
+                emitFailure(.configurationFailed)
                 session.commitConfiguration()
                 return
             }
@@ -158,22 +163,43 @@ struct QRScannerView: UIViewControllerRepresentable {
             didOutput metadataObjects: [AVMetadataObject],
             from connection: AVCaptureConnection
         ) {
-            guard didEmitResult == false,
+            guard isHandlingResult == false,
                   let metadataObject = metadataObjects.first as? AVMetadataMachineReadableCodeObject,
                   let stringValue = metadataObject.stringValue else {
                 return
             }
 
-            didEmitResult = true
-            emit(.success(stringValue))
+            isHandlingResult = true
+            session.stopRunning()
+
+            let decision = onResult?(.success(stringValue)) ?? .finish
+            handle(decision)
         }
 
-        private func emit(_ result: Result<String, QRScannerError>) {
+        private func emitFailure(_ error: QRScannerError) {
             if session.isRunning {
                 session.stopRunning()
             }
-            onResult?(result)
-            onResult = nil
+            let decision = onResult?(.failure(error)) ?? .finish
+            handle(decision)
+        }
+
+        private func handle(_ decision: ScanDecision) {
+            switch decision {
+            case .finish:
+                onResult = nil
+                isHandlingResult = false
+            case .continueScanning:
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                    guard let self else { return }
+                    self.isHandlingResult = false
+                    if self.onResult != nil {
+                        if self.session.isRunning == false {
+                            self.session.startRunning()
+                        }
+                    }
+                }
+            }
         }
 
         private func updateOverlay() {
