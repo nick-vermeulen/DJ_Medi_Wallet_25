@@ -4,6 +4,17 @@ import Compression
 enum PayloadEncoder {
     static let compressionPrefix = "compressed:"
 
+    enum DecodedPayloadFormat {
+        case prefixedCompressed
+        case inferredCompressed
+        case plainUTF8
+    }
+
+    struct DecodedPayload {
+        let data: Data
+        let format: DecodedPayloadFormat
+    }
+
     static func encode<T: Encodable>(_ value: T) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
@@ -17,18 +28,33 @@ enum PayloadEncoder {
     }
 
     static func decodePayload(_ payload: String) throws -> Data {
+        try decodePayloadDetailed(payload).data
+    }
+
+    static func decodePayloadDetailed(_ payload: String) throws -> DecodedPayload {
         if payload.hasPrefix(compressionPrefix) {
             let base64 = String(payload.dropFirst(compressionPrefix.count))
             guard let compressedData = Data(base64Encoded: base64) else {
                 throw PayloadError.invalidBase64
             }
-            return try gzipDecompress(data: compressedData)
-        } else {
-            guard let data = payload.data(using: .utf8) else {
-                throw PayloadError.invalidUTF8
-            }
-            return data
+            let decompressed = try gzipDecompress(data: compressedData)
+            return DecodedPayload(data: decompressed, format: .prefixedCompressed)
         }
+
+        if let base64Data = Data(base64Encoded: payload), looksLikeZlib(base64Data) {
+            let decompressed = try gzipDecompress(data: base64Data)
+            return DecodedPayload(data: decompressed, format: .inferredCompressed)
+        }
+
+        if let utfData = payload.data(using: .utf8) {
+            if looksLikeZlib(utfData) {
+                let decompressed = try gzipDecompress(data: utfData)
+                return DecodedPayload(data: decompressed, format: .inferredCompressed)
+            }
+            return DecodedPayload(data: utfData, format: .plainUTF8)
+        }
+
+        throw PayloadError.invalidUTF8
     }
 
     private static func gzipCompress(data: Data) throws -> Data {
@@ -105,5 +131,15 @@ enum PayloadEncoder {
         case invalidBase64
         case compressionFailed
         case bufferFailure
+    }
+
+    private static func looksLikeZlib(_ data: Data) -> Bool {
+        guard data.count >= 2 else { return false }
+        let header = data[data.startIndex]
+        let flag = data[data.index(after: data.startIndex)]
+        if header == 0x78 && [UInt8(0x01), 0x5E, 0x9C, 0xDA].contains(flag) {
+            return true
+        }
+        return false
     }
 }

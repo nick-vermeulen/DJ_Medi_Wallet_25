@@ -70,6 +70,13 @@ struct CaptureTaskView: View {
         }
     }
 
+    private struct NormalizedPayload {
+        let data: Data
+        let dictionary: [String: Any]
+        let format: PayloadFormat
+        let envelope: String
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -176,6 +183,7 @@ struct CaptureTaskView: View {
                 if let identifier = metadata.requestId, identifier.isEmpty == false {
                     metadataRow(label: "Reference", value: identifier)
                 }
+                metadataRow(label: "Payload Format", value: metadata.payloadFormatDisplayName)
                 if metadata.additionalHighlights.isEmpty == false {
                     Divider()
                     ForEach(metadata.additionalHighlights) { highlight in
@@ -188,9 +196,19 @@ struct CaptureTaskView: View {
             .background(Color(.systemGray6))
             .cornerRadius(12)
 
-            DisclosureGroup("View Raw Payload") {
+            DisclosureGroup("View Normalized JSON") {
                 ScrollView {
                     Text(metadata.rawJSON)
+                        .font(.system(.footnote, design: .monospaced))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                }
+                .frame(maxHeight: 240)
+            }
+            DisclosureGroup("View Original Envelope") {
+                ScrollView {
+                    Text(metadata.rawEnvelope)
                         .font(.system(.footnote, design: .monospaced))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -428,39 +446,85 @@ struct CaptureTaskView: View {
     }
 
     private func parsePayload(_ payload: String) throws -> CaptureMetadata {
-        let data: Data
-        if let decoded = try? PayloadEncoder.decodePayload(payload) {
-            data = decoded
-        } else if let utfData = payload.data(using: .utf8) {
-            data = utfData
-        } else {
-            throw CaptureTaskError.unreadablePayload
-        }
-
-        let jsonObject = try JSONSerialization.jsonObject(with: data, options: [])
-        guard let dictionary = jsonObject as? [String: Any] else {
-            throw CaptureTaskError.unsupportedPayload
-        }
-
-        let reason = CaptureTaskView.locateString(for: ["reason", "requestReason", "purpose"], in: dictionary)
-        let requestType = CaptureTaskView.locateString(for: ["requestType", "type", "category"], in: dictionary)
-        let identifier = CaptureTaskView.locateString(for: ["requestId", "id", "identifier"], in: dictionary)
+        let normalized = try Self.normalizeScannedPayload(payload)
+        let reason = CaptureTaskView.locateString(for: ["reason", "requestReason", "purpose"], in: normalized.dictionary)
+        let requestType = CaptureTaskView.locateString(for: ["requestType", "type", "category"], in: normalized.dictionary)
+        let identifier = CaptureTaskView.locateString(for: ["requestId", "id", "identifier"], in: normalized.dictionary)
         let excludedKeys = ["reason", "requestReason", "purpose", "requestType", "type", "category", "requestId", "id", "identifier"].map { $0.lowercased() }
-        let highlights = CaptureTaskView.collectHighlights(from: dictionary, excludingKeys: excludedKeys)
-        let prettyJSON = try CaptureTaskView.prettyPrintedJSON(from: data)
+        let highlights = CaptureTaskView.collectHighlights(from: normalized.dictionary, excludingKeys: excludedKeys)
+        let prettyJSON = try CaptureTaskView.prettyPrintedJSON(from: normalized.data)
 
         return CaptureMetadata(
             requestId: identifier,
             requestType: requestType,
             reason: reason,
             additionalHighlights: highlights,
-            rawJSON: prettyJSON
+            rawJSON: prettyJSON,
+            rawEnvelope: normalized.envelope,
+            payloadFormat: normalized.format
         )
+    }
+
+    private static func normalizeScannedPayload(_ raw: String) throws -> NormalizedPayload {
+        if let detailed = try? PayloadEncoder.decodePayloadDetailed(raw),
+           let dictionary = try? decodeJSONDictionary(from: detailed.data) {
+            let format = PayloadFormat(from: detailed.format)
+            return NormalizedPayload(data: detailed.data, dictionary: dictionary, format: format, envelope: raw)
+        }
+
+        if raw.lowercased().hasPrefix("sd-jwt:") {
+            let sdjwtData = try decodeSDJWTPayload(raw)
+            let dictionary = try decodeJSONDictionary(from: sdjwtData)
+            return NormalizedPayload(data: sdjwtData, dictionary: dictionary, format: .sdJWT, envelope: raw)
+        }
+
+        guard let utfData = raw.data(using: .utf8) else {
+            throw CaptureTaskError.unreadablePayload
+        }
+        let dictionary = try decodeJSONDictionary(from: utfData)
+        return NormalizedPayload(data: utfData, dictionary: dictionary, format: .plainJSON, envelope: raw)
+    }
+
+    private static func decodeJSONDictionary(from data: Data) throws -> [String: Any] {
+        let object = try JSONSerialization.jsonObject(with: data, options: [])
+        guard let dictionary = object as? [String: Any] else {
+            throw CaptureTaskError.unsupportedPayload
+        }
+        return dictionary
+    }
+
+    private static func decodeSDJWTPayload(_ raw: String) throws -> Data {
+        let prefixLength = "sd-jwt:".count
+        let startIndex = raw.index(raw.startIndex, offsetBy: prefixLength)
+        let suffix = raw[startIndex...]
+        let components = suffix.split(separator: "~", omittingEmptySubsequences: false)
+        guard let jwtComponent = components.first else {
+            throw CaptureTaskError.sdJwtDecodingFailed
+        }
+        let segments = jwtComponent.split(separator: ".", omittingEmptySubsequences: false)
+        guard segments.count >= 2 else {
+            throw CaptureTaskError.sdJwtDecodingFailed
+        }
+        let payloadSegment = String(segments[1])
+        guard let payloadData = base64URLDecode(payloadSegment) else {
+            throw CaptureTaskError.sdJwtDecodingFailed
+        }
+        return payloadData
+    }
+
+    private static func base64URLDecode(_ value: String) -> Data? {
+        var base64 = value.replacingOccurrences(of: "-", with: "+").replacingOccurrences(of: "_", with: "/")
+        let padding = (4 - base64.count % 4) % 4
+        if padding > 0 {
+            base64.append(String(repeating: "=", count: padding))
+        }
+        return Data(base64Encoded: base64)
     }
 
     private enum CaptureTaskError: LocalizedError {
         case unreadablePayload
         case unsupportedPayload
+        case sdJwtDecodingFailed
 
         var errorDescription: String? {
             switch self {
@@ -468,6 +532,8 @@ struct CaptureTaskView: View {
                 return "The scanned QR code does not contain a readable payload."
             case .unsupportedPayload:
                 return "The QR payload was not valid JSON."
+            case .sdJwtDecodingFailed:
+                return "The SD-JWT payload could not be decoded."
             }
         }
     }
@@ -484,12 +550,36 @@ private extension CaptureTaskView {
 }
 
 extension CaptureTaskView {
+    enum PayloadFormat {
+        case sdJWT
+        case compressedWithPrefix
+        case inferredCompressed
+        case plainJSON
+
+        var displayName: String {
+            switch self {
+            case .sdJWT:
+                return "SD-JWT"
+            case .compressedWithPrefix:
+                return "Compressed JSON (prefixed)"
+            case .inferredCompressed:
+                return "Compressed JSON (detected)"
+            case .plainJSON:
+                return "Plain JSON"
+            }
+        }
+    }
+
     struct CaptureMetadata {
         let requestId: String?
         let requestType: String?
         let reason: String?
         let additionalHighlights: [Highlight]
         let rawJSON: String
+        let rawEnvelope: String
+        let payloadFormat: PayloadFormat
+
+        var payloadFormatDisplayName: String { payloadFormat.displayName }
     }
 
     struct Highlight: Identifiable {
@@ -545,6 +635,19 @@ extension CaptureTaskView {
         let object = try JSONSerialization.jsonObject(with: data, options: [])
         let prettyData = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .withoutEscapingSlashes])
         return String(decoding: prettyData, as: UTF8.self)
+    }
+}
+
+extension CaptureTaskView.PayloadFormat {
+    init(from format: PayloadEncoder.DecodedPayloadFormat) {
+        switch format {
+        case .prefixedCompressed:
+            self = .compressedWithPrefix
+        case .inferredCompressed:
+            self = .inferredCompressed
+        case .plainUTF8:
+            self = .plainJSON
+        }
     }
 }
 
