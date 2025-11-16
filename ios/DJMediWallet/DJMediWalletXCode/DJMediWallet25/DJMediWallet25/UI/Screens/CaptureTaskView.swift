@@ -77,6 +77,12 @@ struct CaptureTaskView: View {
         let envelope: String
     }
 
+    private struct FHIRInferredMetadata {
+        let reason: String?
+        let requestType: String?
+        let highlights: [Highlight]
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
@@ -447,11 +453,19 @@ struct CaptureTaskView: View {
 
     private func parsePayload(_ payload: String) throws -> CaptureMetadata {
         let normalized = try Self.normalizeScannedPayload(payload)
-        let reason = CaptureTaskView.locateString(for: ["reason", "requestReason", "purpose"], in: normalized.dictionary)
-        let requestType = CaptureTaskView.locateString(for: ["requestType", "type", "category"], in: normalized.dictionary)
+        var reason = CaptureTaskView.locateString(for: ["reason", "requestReason", "purpose"], in: normalized.dictionary)
+        var requestType = CaptureTaskView.locateString(for: ["requestType", "type", "category"], in: normalized.dictionary)
         let identifier = CaptureTaskView.locateString(for: ["requestId", "id", "identifier"], in: normalized.dictionary)
         let excludedKeys = ["reason", "requestReason", "purpose", "requestType", "type", "category", "requestId", "id", "identifier"].map { $0.lowercased() }
-        let highlights = CaptureTaskView.collectHighlights(from: normalized.dictionary, excludingKeys: excludedKeys)
+        var highlights = CaptureTaskView.collectHighlights(from: normalized.dictionary, excludingKeys: excludedKeys)
+
+        if let inferred = Self.inferFHIRMetadata(from: normalized.dictionary) {
+            if reason == nil { reason = inferred.reason }
+            if requestType == nil { requestType = inferred.requestType }
+            highlights.append(contentsOf: inferred.highlights)
+        }
+
+        highlights = highlights.uniqued()
         let prettyJSON = try CaptureTaskView.prettyPrintedJSON(from: normalized.data)
 
         return CaptureMetadata(
@@ -519,6 +533,139 @@ struct CaptureTaskView: View {
             base64.append(String(repeating: "=", count: padding))
         }
         return Data(base64Encoded: base64)
+    }
+
+    private static func inferFHIRMetadata(from dictionary: [String: Any]) -> FHIRInferredMetadata? {
+        if let resourceType = dictionary["resourceType"] as? String,
+           resourceType.caseInsensitiveCompare("bundle") == .orderedSame,
+           let entries = dictionary["entry"] as? [[String: Any]] {
+            var aggregatedHighlights: [Highlight] = []
+            var derivedReason: String?
+            var derivedType: String?
+
+            for entry in entries {
+                guard let resource = entry["resource"] as? [String: Any] else { continue }
+                if let inference = inferFHIRMetadata(fromResource: resource) {
+                    if derivedReason == nil, let reason = inference.reason { derivedReason = reason }
+                    if derivedType == nil, let type = inference.requestType { derivedType = type }
+                    aggregatedHighlights.append(contentsOf: inference.highlights)
+                }
+            }
+
+            if derivedReason != nil || derivedType != nil || aggregatedHighlights.isEmpty == false {
+                return FHIRInferredMetadata(reason: derivedReason, requestType: derivedType, highlights: aggregatedHighlights)
+            }
+            return nil
+        }
+
+        return inferFHIRMetadata(fromResource: dictionary)
+    }
+
+    private static func inferFHIRMetadata(fromResource resource: [String: Any]) -> FHIRInferredMetadata? {
+        guard let type = resource["resourceType"] as? String else { return nil }
+        switch type {
+        case "Observation":
+            var highlights: [Highlight] = []
+            let reason = extractCodeDescription(from: resource["code"])
+            if let measurement = extractObservationMeasurement(from: resource) {
+                let label = reason ?? "Measurement"
+                highlights.append(Highlight(label: label, value: measurement))
+            }
+            if let interpretation = extractInterpretation(from: resource) {
+                highlights.append(Highlight(label: "Interpretation", value: interpretation))
+            }
+            if let subject = (resource["subject"] as? [String: Any])?["display"] as? String {
+                highlights.append(Highlight(label: "Subject", value: subject))
+            }
+            return FHIRInferredMetadata(reason: reason, requestType: "Observation", highlights: highlights)
+
+        case "DiagnosticReport":
+            var highlights: [Highlight] = []
+            let reason = extractCodeDescription(from: resource["code"])
+            if let conclusion = resource["conclusion"] as? String, conclusion.isEmpty == false {
+                highlights.append(Highlight(label: "Conclusion", value: conclusion))
+            }
+            if let issuer = (resource["performer"] as? [[String: Any]])?.compactMap({ $0["display"] as? String }).first {
+                highlights.append(Highlight(label: "Performer", value: issuer))
+            }
+            return FHIRInferredMetadata(reason: reason, requestType: "DiagnosticReport", highlights: highlights)
+
+        default:
+            return nil
+        }
+    }
+
+    private static func extractCodeDescription(from value: Any?) -> String? {
+        guard let code = value as? [String: Any] else { return nil }
+        if let text = code["text"] as? String, text.isEmpty == false {
+            return text
+        }
+        if let coding = code["coding"] as? [[String: Any]] {
+            for item in coding {
+                if let display = item["display"] as? String, display.isEmpty == false {
+                    return display
+                }
+                if let codeValue = item["code"] as? String, codeValue.isEmpty == false {
+                    return codeValue
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func extractObservationMeasurement(from resource: [String: Any]) -> String? {
+        if let quantity = resource["valueQuantity"] as? [String: Any],
+           let value = quantity["value"],
+           let stringValue = formatFHIRValue(value),
+           let unit = quantity["unit"] as? String, unit.isEmpty == false {
+            return "\(stringValue) \(unit)"
+        }
+
+        if let quantity = resource["valueQuantity"] as? [String: Any],
+           let value = quantity["value"],
+           let stringValue = formatFHIRValue(value) {
+            return stringValue
+        }
+
+        if let string = resource["valueString"] as? String, string.isEmpty == false {
+            return string
+        }
+
+        if let boolValue = resource["valueBoolean"] as? Bool {
+            return boolValue ? "Yes" : "No"
+        }
+
+        return nil
+    }
+
+    private static func extractInterpretation(from resource: [String: Any]) -> String? {
+        guard let interpretations = resource["interpretation"] as? [[String: Any]] else { return nil }
+        for interpretation in interpretations {
+            if let text = interpretation["text"] as? String, text.isEmpty == false {
+                return text
+            }
+            if let coding = interpretation["coding"] as? [[String: Any]] {
+                for item in coding {
+                    if let display = item["display"] as? String, display.isEmpty == false {
+                        return display
+                    }
+                }
+            }
+        }
+        return nil
+    }
+
+    private static func formatFHIRValue(_ value: Any) -> String? {
+        if let doubleValue = value as? Double {
+            return NumberFormatter.fhirMeasurement.string(from: NSNumber(value: doubleValue))
+        }
+        if let intValue = value as? Int {
+            return "\(intValue)"
+        }
+        if let stringValue = value as? String {
+            return stringValue.isEmpty ? nil : stringValue
+        }
+        return nil
     }
 
     private enum CaptureTaskError: LocalizedError {
@@ -663,6 +810,16 @@ private extension Array where Element == CaptureTaskView.Highlight {
         }
         return result
     }
+}
+
+private extension NumberFormatter {
+    static let fhirMeasurement: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = 2
+        formatter.minimumFractionDigits = 0
+        return formatter
+    }()
 }
 
 private extension String {
