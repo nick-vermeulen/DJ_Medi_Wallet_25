@@ -33,6 +33,12 @@ struct ContentView: View {
                 }
 
             if lockManager.userProfile?.role == .practitioner {
+                DisclosureRequestView()
+                    .environmentObject(lockManager)
+                    .tabItem {
+                        Label("Request", systemImage: "doc.text.viewfinder")
+                    }
+                
                 CaptureTaskView()
                     .environmentObject(walletManager)
                     .environmentObject(lockManager)

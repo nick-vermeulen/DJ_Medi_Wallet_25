@@ -51,17 +51,30 @@ extension MedicalCredential {
     }
 
     private func rawFHIRValue(for path: String) -> Any? {
-        guard !path.isEmpty else { return nil }
+        guard let resource = fhirResource else { return nil }
+
+        if path.isEmpty || path == "*" {
+            var payload: [String: Any] = ["resourceType": resource.resourceType]
+            if let id = resource.id {
+                payload["id"] = id
+            }
+            if let data = resource.data {
+                for (key, value) in data {
+                    payload[key] = value
+                }
+            }
+            return payload
+        }
 
         if path == "resourceType" {
-            return fhirResource?.resourceType
+            return resource.resourceType
         }
 
         if path == "id" {
-            return fhirResource?.id
+            return resource.id
         }
 
-        guard let data = fhirResource?.data else {
+        guard let data = resource.data else {
             return nil
         }
 

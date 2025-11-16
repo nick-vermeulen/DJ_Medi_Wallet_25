@@ -18,6 +18,7 @@ enum PayloadEncoder {
     static func encode<T: Encodable>(_ value: T) throws -> String {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.withoutEscapingSlashes]
+        encoder.dateEncodingStrategy = .iso8601
         let data = try encoder.encode(value)
         guard data.count > 2000 else {
             return String(decoding: data, as: UTF8.self)
